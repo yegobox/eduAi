@@ -10,6 +10,9 @@ import 'package:eduai/features/schools/domain/entities/membership.dart';
 import 'package:eduai/features/schools/domain/entities/school.dart';
 import 'package:eduai/features/schools/domain/entities/school_class.dart';
 import 'package:eduai/features/schools/domain/repositories/schools_repository.dart';
+import 'package:eduai/features/tutor/domain/entities/tutor_block.dart';
+import 'package:eduai/features/tutor/domain/entities/tutor_turn.dart';
+import 'package:eduai/features/tutor/domain/repositories/tutor_repository.dart';
 
 /// In-memory [AuthRepository] for deterministic E2E flows — no Supabase,
 /// Firebase, secure storage or network. Behaviour mirrors the real repo's
@@ -287,5 +290,43 @@ class FakeSchoolsRepository implements SchoolsRepository {
     (_classes[schoolId] ??= <SchoolClass>[]).add(c);
     _add(schoolId: schoolId, classId: c.id, role: MemberRole.teacher);
     return Result.success(c);
+  }
+}
+
+/// In-memory [TutorRepository]. Records every asked message so tests can
+/// assert on conversation flow; returns a canned multi-block answer (or a
+/// fixed [failure]) instead of calling data-connector.
+class FakeTutorRepository implements TutorRepository {
+  FakeTutorRepository({this.failure});
+
+  final Failure? failure;
+  final List<String> askedMessages = [];
+  final List<List<TutorTurn>> historySeenPerCall = [];
+
+  @override
+  Future<Result<TutorAnswer>> ask({
+    required String message,
+    required List<TutorTurn> history,
+    String? subject,
+    String? level,
+  }) async {
+    askedMessages.add(message);
+    historySeenPerCall.add(List.of(history));
+    if (failure != null) return Result.failure(failure!);
+    return Result.success(const TutorAnswer(
+      blocks: [
+        TutorTextBlock(
+          'The sky looks blue because air molecules scatter **blue light** more than red light.',
+        ),
+        TutorCheckBlock(
+          question: 'Which color scatters most in the atmosphere?',
+          choices: ['Red', 'Blue', 'Green', 'Yellow'],
+          correctIndex: 1,
+          explanation: 'Blue light has a shorter wavelength, so it scatters more.',
+        ),
+        TutorFollowupsBlock(['Why does the sunset look red?']),
+      ],
+      modelUsed: 'fake-model',
+    ));
   }
 }

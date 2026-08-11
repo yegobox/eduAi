@@ -246,10 +246,25 @@ class _FeatureGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const features = [
-      (Icons.chat_bubble_outline, 'AI Tutor', 'Ask questions, get explanations.'),
-      (Icons.menu_book_outlined, 'Lessons', 'Structured, offline-ready content.'),
-      (Icons.insights_outlined, 'Progress', 'Track mastery over time.'),
-      (Icons.groups_outlined, 'Classrooms', 'Learn together, sync when online.'),
+      (
+        Icons.chat_bubble_outline,
+        'AI Tutor',
+        'Ask questions, get explanations.',
+        AppRoutes.tutor,
+      ),
+      (
+        Icons.menu_book_outlined,
+        'Lessons',
+        'Structured, offline-ready content.',
+        null,
+      ),
+      (Icons.insights_outlined, 'Progress', 'Track mastery over time.', null),
+      (
+        Icons.groups_outlined,
+        'Classrooms',
+        'Learn together, sync when online.',
+        null,
+      ),
     ];
     return GridView.count(
       crossAxisCount:
@@ -260,17 +275,20 @@ class _FeatureGrid extends StatelessWidget {
       crossAxisSpacing: 12,
       childAspectRatio: 3.2,
       children: [
-        for (final (icon, title, subtitle) in features)
+        for (final (icon, title, subtitle, route) in features)
           Card(
             child: ListTile(
               leading: Icon(icon),
               title: Text(title,
                   style: const TextStyle(fontWeight: FontWeight.w600)),
               subtitle: Text(subtitle),
-              trailing: const Chip(
-                label: Text('Soon'),
-                visualDensity: VisualDensity.compact,
-              ),
+              trailing: route == null
+                  ? const Chip(
+                      label: Text('Soon'),
+                      visualDensity: VisualDensity.compact,
+                    )
+                  : const Icon(Icons.chevron_right),
+              onTap: route == null ? null : () => context.push(route),
             ),
           ),
       ],

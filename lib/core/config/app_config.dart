@@ -17,6 +17,7 @@ class AppConfig {
     required this.supabaseAnonKey,
     required this.enablePhoneAuth,
     required this.flavor,
+    required this.dataConnectorUrl,
   });
 
   /// Builds the config from compile-time environment values.
@@ -27,11 +28,17 @@ class AppConfig {
       enablePhoneAuth:
           bool.fromEnvironment('ENABLE_PHONE_AUTH', defaultValue: true),
       flavor: String.fromEnvironment('APP_FLAVOR', defaultValue: 'dev'),
+      dataConnectorUrl: String.fromEnvironment('DATA_CONNECTOR_URL'),
     );
   }
 
   final String supabaseUrl;
   final String supabaseAnonKey;
+
+  /// Base URL of the data-connector service that hosts the AI tutor
+  /// endpoint (`POST /api/edu/tutor/chat`). Empty disables the tutor feature
+  /// but the app still boots.
+  final String dataConnectorUrl;
 
   /// Whether the Firebase phone (SMS) auth path is offered in the UI.
   /// Firebase phone auth is only reachable on Android / iOS / Web, so on
@@ -44,6 +51,9 @@ class AppConfig {
   /// True when the Supabase credentials are present. When false the app still
   /// boots (so the UI is inspectable) but online auth is disabled.
   bool get hasSupabase => supabaseUrl.isNotEmpty && supabaseAnonKey.isNotEmpty;
+
+  /// True when the AI tutor's backend is configured.
+  bool get hasDataConnector => dataConnectorUrl.isNotEmpty;
 
   bool get isProd => flavor == 'prod';
 }

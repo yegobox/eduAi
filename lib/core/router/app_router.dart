@@ -14,6 +14,7 @@ import '../../features/home/presentation/home_screen.dart';
 import '../../features/schools/domain/entities/school.dart';
 import '../../features/schools/presentation/screens/school_detail_screen.dart';
 import '../../features/schools/presentation/screens/schools_list_screen.dart';
+import '../../features/tutor/presentation/screens/tutor_screen.dart';
 import 'app_routes.dart';
 
 /// The app router. Auth status is read from [authControllerProvider] and drives
@@ -97,6 +98,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.home,
         builder: (_, _) => const HomeScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.tutor,
+        builder: (_, _) => const TutorScreen(),
       ),
     ],
   );

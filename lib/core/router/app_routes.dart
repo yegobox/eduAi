@@ -8,6 +8,7 @@ abstract final class AppRoutes {
   static const setPin = '/set-pin';
   static const home = '/';
   static const schools = '/schools';
+  static const tutor = '/tutor';
 
   /// Path for a single school's detail page.
   static String schoolDetail(String id) => '/schools/$id';
