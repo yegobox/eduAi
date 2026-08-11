@@ -1,0 +1,22 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  # Static analysis + the full test suite: unit tests, theme-aware layout
+  # guards, and the end-to-end flow tests (auth, offline unlock, schools).
+  # All flow tests use in-memory fakes, so they run headless with no Supabase,
+  # Firebase or network — fast and deterministic.
+  analyze-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.44.6
+      - run: flutter pub get
+      - run: flutter analyze
+      - run: flutter test
