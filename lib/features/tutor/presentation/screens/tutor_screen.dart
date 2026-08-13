@@ -1,11 +1,16 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/config/config_providers.dart';
+import '../../../progress/application/progress_providers.dart';
 import '../../application/tutor_controller.dart';
 import '../../application/tutor_state.dart';
+import '../../domain/entities/tutor_block.dart';
 import '../../domain/entities/tutor_turn.dart';
 import '../widgets/tutor_block_view.dart';
+import '../widgets/tutor_composer.dart';
 
 const _samplePrompts = [
   'Explain photosynthesis simply',
@@ -36,6 +41,20 @@ class _TutorScreenState extends ConsumerState<TutorScreen> {
     if (text.trim().isEmpty) return;
     _inputController.clear();
     ref.read(tutorControllerProvider.notifier).send(text);
+  }
+
+  /// Records a graded concept check. Best-effort: the card has already shown
+  /// the result, so a recording failure stays silent.
+  void _recordCheck(TutorCheckBlock block, bool correct) {
+    final state = ref.read(tutorControllerProvider);
+    unawaited(
+      ref.read(progressRecorderProvider).check(
+            correct: correct,
+            question: block.question,
+            subject: state.subject,
+            level: state.level,
+          ),
+    );
   }
 
   void _scrollToBottom() {
@@ -82,13 +101,20 @@ class _TutorScreenState extends ConsumerState<TutorScreen> {
             Expanded(
               child: state.turns.isEmpty
                   ? _EmptyState(onPromptTap: _send)
-                  : ListView.builder(
-                      controller: _scrollController,
-                      padding: const EdgeInsets.all(16),
-                      itemCount: state.turns.length,
-                      itemBuilder: (context, i) => _TurnTile(
-                        turn: state.turns[i],
-                        onFollowupTap: _send,
+                  : Center(
+                      child: ConstrainedBox(
+                        constraints:
+                            const BoxConstraints(maxWidth: tutorMaxContentWidth),
+                        child: ListView.builder(
+                          controller: _scrollController,
+                          padding: const EdgeInsets.all(16),
+                          itemCount: state.turns.length,
+                          itemBuilder: (context, i) => _TurnTile(
+                            turn: state.turns[i],
+                            onFollowupTap: _send,
+                            onCheckAnswered: _recordCheck,
+                          ),
+                        ),
                       ),
                     ),
             ),
@@ -98,7 +124,11 @@ class _TutorScreenState extends ConsumerState<TutorScreen> {
                 message: state.failure!.message,
                 onDismiss: () => ref.read(tutorControllerProvider.notifier).dismissError(),
               ),
-            _Composer(controller: _inputController, busy: state.busy, onSend: _send),
+            TutorComposer(
+              controller: _inputController,
+              busy: state.busy,
+              onSend: _send,
+            ),
           ],
         ),
       ),
@@ -110,6 +140,19 @@ class _TutorScreenState extends ConsumerState<TutorScreen> {
     final subjectController = TextEditingController(text: state.subject ?? '');
     final levelController = TextEditingController(text: state.level ?? '');
 
+    try {
+      await _presentContextSheet(context, subjectController, levelController);
+    } finally {
+      subjectController.dispose();
+      levelController.dispose();
+    }
+  }
+
+  Future<void> _presentContextSheet(
+    BuildContext context,
+    TextEditingController subjectController,
+    TextEditingController levelController,
+  ) async {
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -259,10 +302,15 @@ class _EmptyState extends StatelessWidget {
 }
 
 class _TurnTile extends StatelessWidget {
-  const _TurnTile({required this.turn, required this.onFollowupTap});
+  const _TurnTile({
+    required this.turn,
+    required this.onFollowupTap,
+    required this.onCheckAnswered,
+  });
 
   final TutorTurn turn;
   final ValueChanged<String> onFollowupTap;
+  final CheckAnsweredCallback onCheckAnswered;
 
   @override
   Widget build(BuildContext context) {
@@ -293,7 +341,11 @@ class _TurnTile extends StatelessWidget {
               for (final block in blocks)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 6),
-                  child: TutorBlockView(block: block, onFollowupTap: onFollowupTap),
+                  child: TutorBlockView(
+                    block: block,
+                    onFollowupTap: onFollowupTap,
+                    onCheckAnswered: onCheckAnswered,
+                  ),
                 ),
             ],
           ),
@@ -350,41 +402,3 @@ class _ErrorBanner extends StatelessWidget {
   }
 }
 
-class _Composer extends StatelessWidget {
-  const _Composer({required this.controller, required this.busy, required this.onSend});
-
-  final TextEditingController controller;
-  final bool busy;
-  final ValueChanged<String> onSend;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
-      child: Row(
-        children: [
-          Expanded(
-            child: TextField(
-              controller: controller,
-              enabled: !busy,
-              minLines: 1,
-              maxLines: 4,
-              textInputAction: TextInputAction.send,
-              onSubmitted: busy ? null : onSend,
-              decoration: const InputDecoration(
-                hintText: 'Ask a question…',
-                border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(24))),
-                contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          IconButton.filled(
-            onPressed: busy ? null : () => onSend(controller.text),
-            icon: const Icon(Icons.send),
-          ),
-        ],
-      ),
-    );
-  }
-}

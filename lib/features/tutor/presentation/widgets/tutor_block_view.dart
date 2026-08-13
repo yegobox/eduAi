@@ -2,13 +2,25 @@ import 'package:flutter/material.dart';
 
 import '../../domain/entities/tutor_block.dart';
 
+/// Reports a graded concept check so progress can be recorded.
+typedef CheckAnsweredCallback = void Function(
+  TutorCheckBlock block,
+  bool correct,
+);
+
 /// Renders one [TutorBlock]. `onFollowupTap` lets the followups block send a
 /// suggested question with a single tap instead of retyping it.
 class TutorBlockView extends StatelessWidget {
-  const TutorBlockView({super.key, required this.block, this.onFollowupTap});
+  const TutorBlockView({
+    super.key,
+    required this.block,
+    this.onFollowupTap,
+    this.onCheckAnswered,
+  });
 
   final TutorBlock block;
   final ValueChanged<String>? onFollowupTap;
+  final CheckAnsweredCallback? onCheckAnswered;
 
   @override
   Widget build(BuildContext context) {
@@ -16,7 +28,8 @@ class TutorBlockView extends StatelessWidget {
       TutorTextBlock(text: final text) => _RichBlockText(text: text),
       TutorExampleBlock(title: final title, body: final body) =>
         _ExampleCard(title: title, body: body),
-      final TutorCheckBlock check => _CheckCard(block: check),
+      final TutorCheckBlock check =>
+        _CheckCard(block: check, onAnswered: onCheckAnswered),
       TutorFollowupsBlock(items: final items) =>
         _FollowupsRow(items: items, onTap: onFollowupTap),
       TutorUnknownBlock() => const SizedBox.shrink(),
@@ -111,11 +124,14 @@ class _ExampleCard extends StatelessWidget {
 }
 
 /// A low-stakes concept check: pick an option, see it graded in place with an
-/// explanation. This is retrieval practice, not an exam — no score is kept.
+/// explanation. Still retrieval practice rather than an exam — nothing is
+/// shown as a score here — but the first answer is reported through
+/// [onAnswered] so the Progress screen can track accuracy over time.
 class _CheckCard extends StatefulWidget {
-  const _CheckCard({required this.block});
+  const _CheckCard({required this.block, this.onAnswered});
 
   final TutorCheckBlock block;
+  final CheckAnsweredCallback? onAnswered;
 
   @override
   State<_CheckCard> createState() => _CheckCardState();
@@ -123,6 +139,13 @@ class _CheckCard extends StatefulWidget {
 
 class _CheckCardState extends State<_CheckCard> {
   int? _selected;
+
+  /// Only the first answer counts — the choices lock afterwards, so this can
+  /// never double-record.
+  void _choose(int index) {
+    setState(() => _selected = index);
+    widget.onAnswered?.call(widget.block, widget.block.isCorrect(index));
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -159,7 +182,7 @@ class _CheckCardState extends State<_CheckCard> {
                 selected: _selected == i,
                 correct: _selected != null && i == block.correctIndex,
                 wrong: _selected == i && i != block.correctIndex,
-                onTap: _selected == null ? () => setState(() => _selected = i) : null,
+                onTap: _selected == null ? () => _choose(i) : null,
               ),
             if (_selected != null) ...[
               const SizedBox(height: 8),

@@ -258,7 +258,12 @@ class _FeatureGrid extends StatelessWidget {
         'Structured, offline-ready content.',
         null,
       ),
-      (Icons.insights_outlined, 'Progress', 'Track mastery over time.', null),
+      (
+        Icons.insights_outlined,
+        'Progress',
+        'Track mastery over time.',
+        AppRoutes.progress,
+      ),
       (
         Icons.groups_outlined,
         'Classrooms',

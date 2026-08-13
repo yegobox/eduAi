@@ -9,6 +9,7 @@ abstract final class AppRoutes {
   static const home = '/';
   static const schools = '/schools';
   static const tutor = '/tutor';
+  static const progress = '/progress';
 
   /// Path for a single school's detail page.
   static String schoolDetail(String id) => '/schools/$id';

@@ -11,6 +11,7 @@ import '../../features/auth/presentation/screens/set_pin_screen.dart';
 import '../../features/auth/presentation/screens/sign_up_screen.dart';
 import '../../features/auth/presentation/screens/splash_screen.dart';
 import '../../features/home/presentation/home_screen.dart';
+import '../../features/progress/presentation/screens/progress_screen.dart';
 import '../../features/schools/domain/entities/school.dart';
 import '../../features/schools/presentation/screens/school_detail_screen.dart';
 import '../../features/schools/presentation/screens/schools_list_screen.dart';
@@ -102,6 +103,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.tutor,
         builder: (_, _) => const TutorScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.progress,
+        builder: (_, _) => const ProgressScreen(),
       ),
     ],
   );

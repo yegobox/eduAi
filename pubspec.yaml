@@ -46,6 +46,11 @@ dependencies:
   equatable: ^2.1.0
   shared_preferences: ^2.5.5
   collection: ^1.19.1
+  # Debug-only device previewer. A regular (not dev) dependency because
+  # main.dart imports it; it is compiled out of release via kReleaseMode.
+  # Pinned below ^2.8.6, which needs Flutter >=3.44.8 (this SDK is 3.44.6).
+  # Bump once the SDK is upgraded.
+  device_preview_plus: ^2.8.4
 
 dev_dependencies:
   flutter_test:
