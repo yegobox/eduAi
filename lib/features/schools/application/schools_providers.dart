@@ -41,6 +41,19 @@ final schoolsListProvider = FutureProvider.autoDispose<List<School>>((ref) async
   return result.when(success: (v) => v, failure: (f) => throw f);
 });
 
+/// The schools this account belongs to — what a student's own list shows.
+///
+/// Separate from [schoolsListProvider], which is the whole catalog: a student
+/// has no reason to browse every school in the country, and enrolling is done
+/// with a code rather than by picking one off a list.
+final mySchoolsProvider = FutureProvider.autoDispose<List<School>>((ref) async {
+  final offline = ref.watch(isOfflineProvider);
+  final result = await ref
+      .watch(schoolsRepositoryProvider)
+      .fetchMySchools(preferCache: offline);
+  return result.when(success: (v) => v, failure: (f) => throw f);
+});
+
 /// Classes for a given school id.
 final classesProvider = FutureProvider.autoDispose
     .family<List<SchoolClass>, String>((ref, schoolId) async {

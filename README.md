@@ -223,9 +223,24 @@ and in RLS (`may_enrol()`), because a director joining another school would
 consume a seat on that school's licence and put their admin identity inside
 somebody else's roster.
 
+**Enrolment needs the join code**, not a school id. `0007` moved it into
+`enrol_by_code()`, a security-definer function that resolves the code and
+inserts the membership itself. Before that, `may_enrol` accepted any school id:
+the catalog is world-readable to signed-in users, so anybody could browse to a
+school they had nothing to do with, enrol, consume one of its paid seats and
+raise its next invoice. That fell out of the schools list being a
+browse-and-join catalog from before there was anything to bill.
+
+The one direct insert still allowed is a **second class inside a school you
+already belong to** — it adds no seat (seats count distinct students) and it is
+how a student picks up another subject.
+
+Students see only their own schools (`mySchoolsProvider`), and the empty state
+offers the code rather than a list to pick from.
+
 | Account | May insert |
 |---|---|
-| student | `student` membership, in any school |
+| student | `student` membership, but **only via `enrol_by_code`** — and directly in a school they already belong to, to pick up another class |
 | school admin | `owner` / `teacher`, and only in a school it created |
 | parent | nothing — a parent follows a child through `parent_students` |
 | teacher | nothing — added by redeeming a code, never by self-enrolment |
@@ -404,6 +419,7 @@ Supabase CLI:
 #   supabase/migrations/0004_role_repair_and_enrolment_rules.sql
 #   supabase/migrations/0005_test_pricing.sql
 #   supabase/migrations/0006_teachers.sql
+#   supabase/migrations/0007_enrol_by_code.sql
 #   supabase/seed.sql                                  (optional demo schools/classes)
 ```
 

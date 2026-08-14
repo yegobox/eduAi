@@ -58,8 +58,22 @@ class SchoolsActionController extends AutoDisposeNotifier<ActionState> {
           .read(schoolsRepositoryProvider)
           .joinClass(schoolId: schoolId, classId: classId));
 
-  Future<Result<Membership>> joinByCode(String code) => _runMembership(
-      () => ref.read(schoolsRepositoryProvider).joinByCode(code));
+  Future<Result<void>> joinByCode(String code) async {
+    final blocked = _enrolmentBlock();
+    if (blocked != null) {
+      state = ActionState.error(blocked);
+      return Result.failure(blocked);
+    }
+    state = const ActionState.loading();
+    final result = await ref.read(schoolsRepositoryProvider).joinByCode(code);
+    _settle(result.failureOrNull);
+    if (result.isSuccess) {
+      _refreshMemberships();
+      ref.invalidate(mySchoolsProvider);
+      ref.invalidate(schoolsListProvider);
+    }
+    return result;
+  }
 
   Future<Result<void>> leave(String membershipId) async {
     state = const ActionState.loading();
@@ -136,6 +150,7 @@ class SchoolsActionController extends AutoDisposeNotifier<ActionState> {
   /// are always refreshed together.
   void _refreshMemberships() {
     ref.invalidate(myMembershipsProvider);
+    ref.invalidate(mySchoolsProvider);
     ref.invalidate(accessStateProvider);
   }
 

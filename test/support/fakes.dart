@@ -277,19 +277,34 @@ class FakeSchoolsRepository implements SchoolsRepository {
   }) async => Result.success(_add(schoolId: schoolId, classId: classId));
 
   @override
-  Future<Result<Membership>> joinByCode(String code) async {
-    for (final s in _schools) {
-      if (s.joinCode == code) return Result.success(_add(schoolId: s.id));
-    }
+  /// Mirrors `enrol_by_code`: the code resolves the school server-side, and a
+  /// class code wins over a school code.
+  Future<Result<void>> joinByCode(String code) async {
+    final normalized = code.trim().toUpperCase();
     for (final entry in _classes.entries) {
       for (final c in entry.value) {
-        if (c.joinCode == code) {
-          return Result.success(_add(schoolId: c.schoolId, classId: c.id));
+        if (c.joinCode == normalized) {
+          _add(schoolId: c.schoolId, classId: c.id);
+          return const Result.success(null);
         }
+      }
+    }
+    for (final s in _schools) {
+      if (s.joinCode == normalized) {
+        _add(schoolId: s.id);
+        return const Result.success(null);
       }
     }
     return const Result.failure(
       ValidationFailure('No school or class matches that code.'),
+    );
+  }
+
+  @override
+  Future<Result<List<School>>> fetchMySchools({bool preferCache = false}) async {
+    final ids = _memberships.map((m) => m.schoolId).toSet();
+    return Result.success(
+      _schools.where((s) => ids.contains(s.id)).toList(growable: false),
     );
   }
 

@@ -22,6 +22,7 @@ class SchoolsRepositoryImpl implements SchoolsRepository {
 
   static const _log = AppLogger('SchoolsRepo');
   static const _schoolsKey = 'cache.schools.v1';
+  static const _mySchoolsKey = 'cache.my_schools.v1';
   static const _membershipsKey = 'cache.memberships.v1';
 
   // ---- Reads (network-first with offline cache fallback) ----------------
@@ -47,6 +48,29 @@ class SchoolsRepositoryImpl implements SchoolsRepository {
         final cached = await _readSchoolCache();
         if (cached != null) return Result.success(cached);
       }
+      _log.debug(s);
+      return Result.failure(_mapError(e));
+    }
+  }
+
+  @override
+  Future<Result<List<School>>> fetchMySchools({bool preferCache = false}) async {
+    final memberships = await fetchMyMemberships(preferCache: preferCache);
+    final ids = memberships.valueOrNull?.map((m) => m.schoolId).toSet();
+    if (ids == null) {
+      return Result.failure(
+        memberships.failureOrNull ?? const UnknownFailure(),
+      );
+    }
+    if (ids.isEmpty) return const Result.success([]);
+    try {
+      final schools = await _remote.fetchSchoolsByIds(ids);
+      await _writeCache(_mySchoolsKey, schools);
+      return Result.success(schools);
+    } catch (e, s) {
+      _log.warn('fetchMySchools failed: $e');
+      final cached = await _readSchoolCache(_mySchoolsKey);
+      if (cached != null) return Result.success(cached);
       _log.debug(s);
       return Result.failure(_mapError(e));
     }
@@ -98,24 +122,18 @@ class SchoolsRepositoryImpl implements SchoolsRepository {
           _remote.insertMembership(schoolId: schoolId, classId: classId));
 
   @override
-  Future<Result<Membership>> joinByCode(String code) async {
+  Future<Result<void>> joinByCode(String code) async {
     final trimmed = code.trim();
     if (trimmed.isEmpty) {
       return const Result.failure(ValidationFailure('Enter a join code.'));
     }
     try {
-      final school = await _remote.findSchoolByCode(trimmed);
-      if (school != null) return joinSchool(school.id);
-
-      final klass = await _remote.findClassByCode(trimmed);
-      if (klass != null) {
-        return joinClass(schoolId: klass.schoolId, classId: klass.id);
-      }
-      return const Result.failure(
-        ValidationFailure('No school or class matches that code.'),
-      );
+      // Resolved and inserted server-side: the code is what authorises the
+      // enrolment, so the client never gets to name the school itself.
+      await _remote.enrolByCode(trimmed);
+      return const Result.success(null);
     } catch (e, s) {
-      _log.error('joinByCode failed', e, s);
+      _log.error('enrolByCode failed', e, s);
       return Result.failure(_mapError(e));
     }
   }
@@ -215,8 +233,8 @@ class SchoolsRepositoryImpl implements SchoolsRepository {
     );
   }
 
-  Future<List<School>?> _readSchoolCache() async {
-    final raw = await _cache.getJson(_schoolsKey);
+  Future<List<School>?> _readSchoolCache([String key = _schoolsKey]) async {
+    final raw = await _cache.getJson(key);
     if (raw is! List) return null;
     return raw
         .whereType<Map>()

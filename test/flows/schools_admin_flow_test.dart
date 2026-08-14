@@ -22,8 +22,17 @@ const _adminSession = AuthSession(
 );
 
 void main() {
-  Future<void> openSchools(WidgetTester tester) async {
-    await tester.tap(find.text('Browse'));
+  /// Enrols with a class code, then opens the school it resolved to — the only
+  /// way a student reaches a school page now that the catalog is gone.
+  Future<void> enrolAndOpenSchool(WidgetTester tester) async {
+    await tester.tap(find.text('Join by code').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('not-enrolled-join')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField).first, 'ENG6');
+    await tester.tap(find.widgetWithText(FilledButton, 'Join'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Kigali Modern Academy').first);
     await tester.pumpAndSettle();
   }
 
@@ -81,12 +90,18 @@ void main() {
       // The server refuses the insert (`classes_insert_self`), so this was never
       // a hole — but a button that always fails is still a bug.
       await pumpApp(tester, auth: FakeAuthRepository(initialSession: _session));
-      await openSchools(tester);
-      await tester.tap(find.text('Kigali Modern Academy'));
-      await tester.pumpAndSettle();
+      await enrolAndOpenSchool(tester);
 
       expect(find.text('Add class'), findsNothing);
-      expect(find.text('No classes yet. Your school adds them.'), findsNothing);
+    });
+
+    testWidgets('a student is not offered school creation', (tester) async {
+      // "New school" used to be an unguarded button for every signed-in account.
+      await pumpApp(tester, auth: FakeAuthRepository(initialSession: _session));
+      await tester.tap(find.text('Join by code').last);
+      await tester.pumpAndSettle();
+
+      expect(find.text('New school'), findsNothing);
     });
 
     testWidgets('joining a class counts as joining its school', (tester) async {
@@ -94,21 +109,7 @@ void main() {
       // already in the school — offering "Join this school" again would add a
       // second, redundant row.
       await pumpApp(tester, auth: FakeAuthRepository(initialSession: _session));
-      await openSchools(tester);
-      await tester.tap(find.text('Kigali Modern Academy'));
-      await tester.pumpAndSettle();
-
-      final classCard = find.ancestor(
-        of: find.text('P6 — English'),
-        matching: find.byType(AppCard),
-      );
-      await tester.tap(
-        find.descendant(
-          of: classCard,
-          matching: find.widgetWithText(FilledButton, 'Join'),
-        ),
-      );
-      await tester.pumpAndSettle();
+      await enrolAndOpenSchool(tester);
 
       expect(find.text('You are a member'), findsOneWidget);
       expect(find.text('You joined through a class below.'), findsOneWidget);
@@ -126,75 +127,18 @@ void main() {
       );
     });
 
-    testWidgets('a student cannot create a school', (tester) async {
-      // This was the hole: "New school" used to be an unguarded button on the
-      // catalog for every signed-in account.
-      await pumpApp(tester, auth: FakeAuthRepository(initialSession: _session));
-      await openSchools(tester);
-
-      expect(find.text('New school'), findsNothing);
-      expect(find.text('Join by code'), findsOneWidget);
-      expect(
-        find.textContaining('a parent can subscribe for you instead'),
-        findsNothing,
-      );
-    });
-
-    // Class authoring moved off this page entirely — it is student-facing and
-    // the route is only reachable from the student home. An admin adds classes
-    // on the People tab (admin_screens_test) and a teacher on their Classes tab
-    // (teacher_screens_test).
-
-    testWidgets('joining then leaving a school flips the membership card', (
+    testWidgets('leaving the class removes the school from the list', (
       tester,
     ) async {
       await pumpApp(tester, auth: FakeAuthRepository(initialSession: _session));
-      await openSchools(tester);
-      await tester.tap(find.text('Kigali Modern Academy'));
-      await tester.pumpAndSettle();
-
-      final membershipCard = find.ancestor(
-        of: find.text('Join this school'),
-        matching: find.byType(AppCard),
-      );
-      await tester.tap(
-        find.descendant(
-          of: membershipCard,
-          matching: find.widgetWithText(FilledButton, 'Join'),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      expect(find.text('You are a member'), findsOneWidget);
+      await enrolAndOpenSchool(tester);
 
       await tester.tap(find.widgetWithText(OutlinedButton, 'Leave').first);
       await tester.pumpAndSettle();
-      expect(find.text('Join this school'), findsOneWidget);
-    });
-
-    testWidgets('a joined school reads as joined in the catalog', (
-      tester,
-    ) async {
-      await pumpApp(tester, auth: FakeAuthRepository(initialSession: _session));
-      await openSchools(tester);
-      await tester.tap(find.text('Kigali Modern Academy'));
-      await tester.pumpAndSettle();
-
-      final membershipCard = find.ancestor(
-        of: find.text('Join this school'),
-        matching: find.byType(AppCard),
-      );
-      await tester.tap(
-        find.descendant(
-          of: membershipCard,
-          matching: find.widgetWithText(FilledButton, 'Join'),
-        ),
-      );
-      await tester.pumpAndSettle();
-
       await tester.pageBack();
       await tester.pumpAndSettle();
-      expect(find.text('JOINED'), findsOneWidget);
+
+      expect(find.text('You have not joined a school yet'), findsOneWidget);
     });
   });
 }

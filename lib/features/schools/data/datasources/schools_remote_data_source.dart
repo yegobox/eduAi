@@ -34,6 +34,21 @@ class SchoolsRemoteDataSource {
     return rows.map((r) => School.fromJson(r)).toList();
   }
 
+  /// Just the schools with these ids — what a student's own list needs.
+  ///
+  /// Fetching the whole catalog to filter it client-side would still pull every
+  /// school in the country onto the device to show the one they belong to.
+  Future<List<School>> fetchSchoolsByIds(Iterable<String> ids) async {
+    final list = ids.toSet().toList();
+    if (list.isEmpty) return const [];
+    final rows = await _c
+        .from('schools')
+        .select()
+        .inFilter('id', list)
+        .order('name');
+    return rows.map((r) => School.fromJson(r)).toList();
+  }
+
   Future<List<SchoolClass>> fetchClasses(String schoolId) async {
     final rows =
         await _c.from('classes').select().eq('school_id', schoolId).order('name');
@@ -61,6 +76,15 @@ class SchoolsRemoteDataSource {
   }
 
   // ---- Writes ------------------------------------------------------------
+
+  /// Enrols with a join code through `enrol_by_code`.
+  ///
+  /// A `security definer` function rather than a client insert: getting into a
+  /// school must require the code, or anybody could enrol into a school they
+  /// found in the catalog and consume one of its paid seats.
+  Future<void> enrolByCode(String code) async {
+    await _c.rpc('enrol_by_code', params: {'p_code': code});
+  }
 
   Future<Membership> insertMembership({
     required String schoolId,

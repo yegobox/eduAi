@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:eduai/core/network/connectivity_service.dart';
@@ -52,7 +53,7 @@ void main() {
       expect(find.text('Unlock'), findsOneWidget);
     });
 
-    testWidgets('schools list + detail render cleanly ($label)', (
+    testWidgets('my-school page renders cleanly ($label)', (
       tester,
     ) async {
       await pumpApp(
@@ -60,14 +61,12 @@ void main() {
         size: size,
         auth: FakeAuthRepository(initialSession: authedSession),
       );
-      await tester.tap(find.text('Browse'));
+      // The home entry point is labelled at every width.
+      await tester.tap(find.widgetWithText(FilledButton, 'Join by code'));
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
-
-      await tester.tap(find.text('Kigali Modern Academy').first);
-      await tester.pumpAndSettle();
-      expect(tester.takeException(), isNull);
-      expect(find.text('P5 — Maths'), findsOneWidget);
+      // Not enrolled yet, so the page offers a code rather than a catalog.
+      expect(find.text('You have not joined a school yet'), findsOneWidget);
     });
   }
 }

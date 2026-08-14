@@ -93,7 +93,9 @@ class _SchoolsSection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final memberships = ref.watch(myMembershipsProvider);
-    final schools = ref.watch(schoolsListProvider).valueOrNull ?? const [];
+    // The student's own schools, not the catalog: this only needs to name the
+    // ones they belong to.
+    final schools = ref.watch(mySchoolsProvider).valueOrNull ?? const [];
 
     String schoolName(String id) =>
         schools.firstWhereOrNull((s) => s.id == id)?.name ?? 'School';
@@ -103,10 +105,12 @@ class _SchoolsSection extends ConsumerWidget {
       children: [
         SectionTitle(
           'My schools & classes',
+          // Not "Browse": there is nothing to browse. Enrolment is by code, so
+          // this opens the student's own school and the code entry with it.
           trailing: FilledButton.tonalIcon(
             onPressed: () => context.push(AppRoutes.schools),
-            icon: const Icon(Icons.search, size: 16),
-            label: const Text('Browse'),
+            icon: const Icon(Icons.vpn_key_outlined, size: 16),
+            label: const Text('Join by code'),
           ),
         ),
         const SizedBox(height: 8),
@@ -146,7 +150,9 @@ class _SchoolsSection extends ConsumerWidget {
                             style: TextStyle(fontWeight: FontWeight.w700),
                           ),
                           SizedBox(height: 2),
-                          Text('Browse schools or use a join code to start.'),
+                          Text(
+                            'Enter the code your teacher gave you to start.',
+                          ),
                         ],
                       ),
                     ),

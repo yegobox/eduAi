@@ -14,6 +14,9 @@ abstract interface class SchoolsRepository {
     bool preferCache = false,
   });
 
+  /// The schools this account actually belongs to. What a student sees.
+  Future<Result<List<School>>> fetchMySchools({bool preferCache = false});
+
   Future<Result<List<SchoolClass>>> fetchClasses(String schoolId);
 
   /// The signed-in user's memberships.
@@ -30,8 +33,11 @@ abstract interface class SchoolsRepository {
     required String classId,
   });
 
-  /// Resolve a join code to a school or class and enrol the user.
-  Future<Result<Membership>> joinByCode(String code);
+  /// Enrols with a join code, resolved and inserted server-side.
+  ///
+  /// The code is what authorises the enrolment: a client cannot name the school
+  /// itself, because getting into a school consumes one of its paid seats.
+  Future<Result<void>> joinByCode(String code);
 
   /// Leave a school/class by membership id.
   Future<Result<void>> leave(String membershipId);

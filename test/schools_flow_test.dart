@@ -16,93 +16,110 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  /// Enrols with a code from the student's own school page.
+  Future<void> joinWithCode(WidgetTester tester, String code) async {
+    await tester.tap(find.text('Join by code').last);
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField).first, code);
+    await tester.tap(find.widgetWithText(FilledButton, 'Join'));
+    await tester.pumpAndSettle();
+  }
+
   group('Schools flow', () {
-    testWidgets('browse → open school → join a class → shows on home', (
+    testWidgets('a student with no school is offered the code, not a list', (
+      tester,
+    ) async {
+      // Browsing every school in the country was never a student flow, and
+      // enrolling from that list consumed a seat on somebody else's licence.
+      await pumpApp(tester, auth: FakeAuthRepository());
+      await signIn(tester);
+
+      await tester.tap(find.text('Join by code').last);
+      await tester.pumpAndSettle();
+
+      expect(find.text('My school'), findsOneWidget);
+      expect(find.text('You have not joined a school yet'), findsOneWidget);
+      expect(find.byKey(const Key('not-enrolled-join')), findsOneWidget);
+      // No catalog.
+      expect(find.text('Kigali Modern Academy'), findsNothing);
+      expect(find.text('Green Hills Secondary'), findsNothing);
+    });
+
+    testWidgets('a code enrols, and only that school is listed', (
       tester,
     ) async {
       await pumpApp(tester, auth: FakeAuthRepository());
       await signIn(tester);
-
-      await tester.tap(find.text('Browse'));
+      await tester.tap(find.text('Join by code').last);
       await tester.pumpAndSettle();
-      expect(find.text('Schools'), findsOneWidget);
+      await joinWithCode(tester, 'ENG6');
+
+      // The class code resolved its school, which is now the only one shown.
       expect(find.text('Kigali Modern Academy'), findsWidgets);
+      expect(find.text('Green Hills Secondary'), findsNothing);
+      expect(find.text('You have not joined a school yet'), findsNothing);
+    });
+
+    testWidgets('the joined school opens, and the class reads as joined', (
+      tester,
+    ) async {
+      await pumpApp(tester, auth: FakeAuthRepository());
+      await signIn(tester);
+      await tester.tap(find.text('Join by code').last);
+      await tester.pumpAndSettle();
+      await joinWithCode(tester, 'ENG6');
 
       await tester.tap(find.text('Kigali Modern Academy').first);
       await tester.pumpAndSettle();
-      expect(find.text('P5 — Maths'), findsOneWidget);
 
+      expect(find.text('P6 — English'), findsOneWidget);
       final classCard = find.ancestor(
-        of: find.text('P5 — Maths'),
+        of: find.text('P6 — English'),
         matching: find.byType(AppCard),
       );
-      await tester.tap(
-        find.descendant(
-          of: classCard,
-          matching: find.widgetWithText(FilledButton, 'Join'),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      // Class now reads as joined.
       expect(
         find.descendant(of: classCard, matching: find.text('Leave')),
         findsOneWidget,
       );
+      // Already in the school through that class.
+      expect(find.text('You are a member'), findsOneWidget);
+      expect(find.text('Join this school'), findsNothing);
+    });
 
-      // Pop detail → list → home (two pushes deep), then confirm the school
-      // shows under "My schools & classes".
-      await tester.pageBack(); // detail → schools list
+    testWidgets('it shows on home under My schools & classes', (tester) async {
+      await pumpApp(tester, auth: FakeAuthRepository());
+      await signIn(tester);
+      await tester.tap(find.text('Join by code').last);
       await tester.pumpAndSettle();
-      await tester.pageBack(); // schools list → home
+      await joinWithCode(tester, 'ENG6');
+
+      await tester.pageBack();
       await tester.pumpAndSettle();
+
       expect(find.textContaining('Hello'), findsOneWidget);
       expect(find.text('Kigali Modern Academy'), findsWidgets);
+      expect(find.text("You haven't joined anywhere yet"), findsNothing);
     });
 
-    testWidgets('valid join code enrols and marks the school joined', (
+    testWidgets('an invalid code keeps the dialog open with the reason', (
       tester,
     ) async {
       await pumpApp(tester, auth: FakeAuthRepository());
       await signIn(tester);
-
-      await tester.tap(find.text('Browse'));
+      await tester.tap(find.text('Join by code').last);
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Join by code'));
+      await tester.tap(find.byKey(const Key('not-enrolled-join')));
       await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField).first, 'NOPE');
+      await tester.tap(find.widgetWithText(FilledButton, 'Join'));
+      await tester.pumpAndSettle();
+
       expect(find.text('Join with a code'), findsOneWidget);
-
-      await tester.enterText(find.byType(TextField).first, 'GHS24');
-      await tester.tap(find.widgetWithText(FilledButton, 'Join'));
-      await tester.pumpAndSettle();
-
-      expect(find.text('Join with a code'), findsNothing); // dialog closed
-      // The badge renders uppercase as a visual treatment.
-      expect(find.text('JOINED'), findsWidgets);
-    });
-
-    testWidgets('invalid join code shows an error and keeps the dialog open', (
-      tester,
-    ) async {
-      await pumpApp(tester, auth: FakeAuthRepository());
-      await signIn(tester);
-
-      await tester.tap(find.text('Browse'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Join by code'));
-      await tester.pumpAndSettle();
-
-      await tester.enterText(find.byType(TextField).first, 'NOPE99');
-      await tester.tap(find.widgetWithText(FilledButton, 'Join'));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 400));
-
       expect(
-        find.text('No school or class matches that code.'),
+        find.textContaining('No school or class matches that code'),
         findsOneWidget,
       );
-      expect(find.text('Join with a code'), findsOneWidget); // still open
     });
   });
 }

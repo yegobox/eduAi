@@ -13,58 +13,54 @@ import '../../application/schools_providers.dart';
 import '../../domain/entities/school.dart';
 import '../widgets/schools_dialogs.dart';
 
-/// Browse the school catalog and join by code — or, for a school-admin
-/// identity, create a school.
+/// The schools this account belongs to.
 ///
-/// Creating a school is a school-admin action. It used to be an unguarded
-/// button on this page for every signed-in account, which is how anybody could
-/// stand up a school for free; the server now refuses the insert as well, so
-/// hiding the button keeps the UI honest rather than doing the enforcing.
+/// It used to list the whole catalog — every school in the country — with a
+/// "Join" on each. That was wrong twice over: a student has no business browsing
+/// other people's schools, and enrolling into one consumed a seat on *its*
+/// licence, so anybody could raise a stranger's invoice. Enrolment now needs the
+/// code a teacher hands out (`enrol_by_code`), and this screen shows only what
+/// the code got you.
 class SchoolsListScreen extends ConsumerWidget {
   const SchoolsListScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final schools = ref.watch(schoolsListProvider);
-    final joinedIds = ref.watch(joinedSchoolIdsProvider);
-    final canCreate = ref.watch(activeRoleProvider) == AppRole.schoolAdmin;
+    final mine = ref.watch(mySchoolsProvider);
+    final canEnrol = ref.watch(activeRoleProvider) == AppRole.student;
+
+    // A back chevron, a title and a labelled action do not fit an app bar at
+    // phone width — the label is dropped for a tooltip rather than letting the
+    // row overflow.
+    final compact = MediaQuery.sizeOf(context).width < 500;
 
     return DetailScaffold(
-      title: 'Schools',
+      title: 'My school',
       actions: [
-        // Enrolling is a student action. A director browsing the catalog is
-        // looking, not joining.
-        if (ref.watch(activeRoleProvider) == AppRole.student)
-          TextButton.icon(
-            onPressed: () => showJoinByCodeDialog(context),
-            icon: const Icon(Icons.vpn_key_outlined, size: 16),
-            label: const Text('Join by code'),
-          ),
+        if (canEnrol)
+          compact
+              ? IconButton(
+                  onPressed: () => showJoinByCodeDialog(context),
+                  icon: const Icon(Icons.vpn_key_outlined, size: 18),
+                  tooltip: 'Join by code',
+                )
+              : TextButton.icon(
+                  onPressed: () => showJoinByCodeDialog(context),
+                  icon: const Icon(Icons.vpn_key_outlined, size: 16),
+                  label: const Text('Join by code'),
+                ),
       ],
-      bottomBar: canCreate
-          ? SizedBox(
-              width: double.infinity,
-              child: FilledButton.icon(
-                onPressed: () => showCreateSchoolDialog(context),
-                icon: const Icon(Icons.add, size: 16),
-                label: const Text('New school'),
-              ),
-            )
-          : null,
       child: RefreshIndicator(
-        onRefresh: () async => ref.invalidate(schoolsListProvider),
+        onRefresh: () async => ref.invalidate(mySchoolsProvider),
         child: AsyncValueView<List<School>>(
-          value: schools,
-          onRetry: () => ref.invalidate(schoolsListProvider),
+          value: mine,
+          onRetry: () => ref.invalidate(mySchoolsProvider),
           isEmpty: (list) => list.isEmpty,
-          emptyBuilder: () => const _EmptyCatalog(),
+          emptyBuilder: () => _NotEnrolled(canEnrol: canEnrol),
           data: (list) => ListView.separated(
             itemCount: list.length,
             separatorBuilder: (_, _) => const SizedBox(height: 8),
-            itemBuilder: (context, i) => _SchoolCard(
-              school: list[i],
-              joined: joinedIds.contains(list[i].id),
-            ),
+            itemBuilder: (context, i) => _SchoolCard(school: list[i]),
           ),
         ),
       ),
@@ -73,10 +69,9 @@ class SchoolsListScreen extends ConsumerWidget {
 }
 
 class _SchoolCard extends StatelessWidget {
-  const _SchoolCard({required this.school, required this.joined});
+  const _SchoolCard({required this.school});
 
   final School school;
-  final bool joined;
 
   @override
   Widget build(BuildContext context) {
@@ -109,33 +104,56 @@ class _SchoolCard extends StatelessWidget {
               ],
             ),
           ),
-          if (joined)
-            const AppBadge('Joined', tone: AppTone.success)
-          else
-            Icon(Icons.chevron_right, color: t.ink3),
+          Icon(Icons.chevron_right, color: t.ink3),
         ],
       ),
     );
   }
 }
 
-class _EmptyCatalog extends ConsumerWidget {
-  const _EmptyCatalog();
+/// Not enrolled anywhere yet. The only way in is a code, so the placeholder
+/// offers exactly that rather than a list to pick from.
+class _NotEnrolled extends StatelessWidget {
+  const _NotEnrolled({required this.canEnrol});
+
+  final bool canEnrol;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final canCreate = ref.watch(activeRoleProvider) == AppRole.schoolAdmin;
+  Widget build(BuildContext context) {
+    final t = AppTokens.read(context);
     return ListView(
       children: [
-        const SizedBox(height: 80),
+        const SizedBox(height: 60),
+        // The action sits *below* the banner rather than inside it: TrustBanner
+        // lays its action out beside the text, which squeezes a long body into
+        // a very tall column at phone width. A full-width button is the right
+        // shape for an empty state anyway.
         TrustBanner(
           icon: Icons.school_outlined,
-          title: 'No schools yet',
-          body: canCreate
-              ? 'Create yours below to start a 30-day trial.'
-              : 'Join with the code your teacher gave you. If your school does '
-                    'not use EduAI yet, a parent can subscribe for you instead.',
+          title: canEnrol
+              ? 'You have not joined a school yet'
+              : 'No school linked to this account',
+          body: canEnrol
+              ? 'Enter the code your teacher gave you. It enrols you in their '
+                    'class, and everything they share shows up here.'
+              : 'Only student accounts enrol in a school.',
         ),
+        if (canEnrol) ...[
+          const SizedBox(height: 12),
+          FilledButton.icon(
+            key: const Key('not-enrolled-join'),
+            onPressed: () => showJoinByCodeDialog(context),
+            icon: const Icon(Icons.vpn_key_outlined, size: 16),
+            label: const Text('Enter a join code'),
+          ),
+          const SizedBox(height: 12),
+          Center(
+            child: Text(
+              'No code? A parent can subscribe for you instead.',
+              style: TextStyle(fontSize: 12.5, color: t.ink3),
+            ),
+          ),
+        ],
       ],
     );
   }
