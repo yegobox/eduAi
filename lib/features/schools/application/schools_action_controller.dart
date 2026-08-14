@@ -3,6 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/error/failure.dart';
 import '../../../core/error/result.dart';
 import '../../../core/state/action_state.dart';
+import '../../access/application/access_providers.dart';
+import '../../auth/application/auth_controller.dart';
+import '../../auth/domain/entities/app_role.dart';
 import '../domain/entities/membership.dart';
 import '../domain/entities/school.dart';
 import '../domain/entities/school_class.dart';
@@ -13,6 +16,31 @@ import 'schools_providers.dart';
 class SchoolsActionController extends AutoDisposeNotifier<ActionState> {
   @override
   ActionState build() => const ActionState.idle();
+
+  /// Enrolling consumes a seat on the school's licence, so it belongs to
+  /// student accounts only. A director joining another school would take a seat
+  /// there and land their own admin identity inside somebody else's roster; a
+  /// parent follows a child through a family link, not an enrolment.
+  ///
+  /// Read from the signed-in session rather than [activeRoleProvider] on
+  /// purpose: this is an authorisation decision, and the debug "View as"
+  /// override must not be able to move it. The server enforces the same rule
+  /// in `may_enrol()` — this only saves a round trip and gives a better message.
+  Failure? _enrolmentBlock() {
+    final role =
+        ref.read(authControllerProvider).session?.user.role ?? AppRole.student;
+    return switch (role) {
+      AppRole.student => null,
+      AppRole.schoolAdmin => const ValidationFailure(
+        'A school account cannot enrol as a student. Manage your own school '
+        'from the Licence tab.',
+      ),
+      AppRole.parent => const ValidationFailure(
+        'Parent accounts do not join schools. Link your child instead, and '
+        'their school comes with them.',
+      ),
+    };
+  }
 
   Future<Result<Membership>> joinSchool(String schoolId) =>
       _runMembership(() =>
@@ -53,6 +81,10 @@ class SchoolsActionController extends AutoDisposeNotifier<ActionState> {
     if (result.isSuccess) {
       ref.invalidate(schoolsListProvider);
       _refreshMemberships();
+      // Creating a school starts its trial licence (by trigger, server-side),
+      // which is a change of entitlement — the admin shell must see it without
+      // a restart.
+      ref.invalidate(accessStateProvider);
     }
     return result;
   }
@@ -78,9 +110,16 @@ class SchoolsActionController extends AutoDisposeNotifier<ActionState> {
     return result;
   }
 
+  /// Every enrolment path funnels through here, so the role check cannot be
+  /// bypassed by adding a fourth way to join.
   Future<Result<Membership>> _runMembership(
     Future<Result<Membership>> Function() action,
   ) async {
+    final blocked = _enrolmentBlock();
+    if (blocked != null) {
+      state = ActionState.error(blocked);
+      return Result.failure(blocked);
+    }
     state = const ActionState.loading();
     final result = await action();
     _settle(result.failureOrNull);
@@ -88,7 +127,13 @@ class SchoolsActionController extends AutoDisposeNotifier<ActionState> {
     return result;
   }
 
-  void _refreshMemberships() => ref.invalidate(myMembershipsProvider);
+  /// Memberships are what a student's entitlement is derived from — joining a
+  /// licensed school grants access, leaving it takes access away — so the two
+  /// are always refreshed together.
+  void _refreshMemberships() {
+    ref.invalidate(myMembershipsProvider);
+    ref.invalidate(accessStateProvider);
+  }
 
   void _settle(Failure? failure) {
     state = failure == null

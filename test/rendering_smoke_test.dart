@@ -52,14 +52,15 @@ void main() {
       expect(find.text('Unlock'), findsOneWidget);
     });
 
-    testWidgets('schools list + detail render cleanly ($label)',
-        (tester) async {
+    testWidgets('schools list + detail render cleanly ($label)', (
+      tester,
+    ) async {
       await pumpApp(
         tester,
         size: size,
         auth: FakeAuthRepository(initialSession: authedSession),
       );
-      await tester.tap(find.text('Browse schools'));
+      await tester.tap(find.text('Browse'));
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
 

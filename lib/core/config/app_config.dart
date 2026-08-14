@@ -18,6 +18,10 @@ class AppConfig {
     required this.enablePhoneAuth,
     required this.flavor,
     required this.dataConnectorUrl,
+    this.momoApiUrl = '',
+    this.momoStatusApiUrl = '',
+    this.momoBranchId = '',
+    this.momoBusinessId = '',
   });
 
   /// Builds the config from compile-time environment values.
@@ -25,10 +29,16 @@ class AppConfig {
     return const AppConfig(
       supabaseUrl: String.fromEnvironment('SUPABASE_URL'),
       supabaseAnonKey: String.fromEnvironment('SUPABASE_ANON_KEY'),
-      enablePhoneAuth:
-          bool.fromEnvironment('ENABLE_PHONE_AUTH', defaultValue: true),
+      enablePhoneAuth: bool.fromEnvironment(
+        'ENABLE_PHONE_AUTH',
+        defaultValue: true,
+      ),
       flavor: String.fromEnvironment('APP_FLAVOR', defaultValue: 'dev'),
       dataConnectorUrl: String.fromEnvironment('DATA_CONNECTOR_URL'),
+      momoApiUrl: String.fromEnvironment('MOMO_API_URL'),
+      momoStatusApiUrl: String.fromEnvironment('MOMO_STATUS_API_URL'),
+      momoBranchId: String.fromEnvironment('MOMO_BRANCH_ID'),
+      momoBusinessId: String.fromEnvironment('MOMO_BUSINESS_ID'),
     );
   }
 
@@ -48,12 +58,36 @@ class AppConfig {
   /// Deployment flavor: `dev`, `staging`, `prod`.
   final String flavor;
 
+  /// Base URL that serves `POST /v2/api/payNow` — the same Mobile Money
+  /// gateway Flipper pays through.
+  final String momoApiUrl;
+
+  /// Base URL that serves
+  /// `GET /v2/api/requesttopay/status/{reference}/{branchId}`. Often a
+  /// different host from [momoApiUrl]; falls back to it when unset.
+  final String momoStatusApiUrl;
+
+  /// Collection branch the payment is booked against. Must be identical in the
+  /// payNow request and the status URL, or MTN returns "not found".
+  final String momoBranchId;
+
+  /// EduAI's merchant/business id at the gateway. Optional — omitted from the
+  /// payload when empty, matching the gateway's contract.
+  final String momoBusinessId;
+
   /// True when the Supabase credentials are present. When false the app still
   /// boots (so the UI is inspectable) but online auth is disabled.
   bool get hasSupabase => supabaseUrl.isNotEmpty && supabaseAnonKey.isNotEmpty;
 
   /// True when the AI tutor's backend is configured.
   bool get hasDataConnector => dataConnectorUrl.isNotEmpty;
+
+  /// True when Mobile Money top-ups can be initiated on this build.
+  bool get hasMomo => momoApiUrl.isNotEmpty && momoBranchId.isNotEmpty;
+
+  /// Where to poll for request-to-pay status.
+  String get momoStatusBase =>
+      momoStatusApiUrl.isNotEmpty ? momoStatusApiUrl : momoApiUrl;
 
   bool get isProd => flavor == 'prod';
 }

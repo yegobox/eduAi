@@ -1,3 +1,4 @@
+import 'package:eduai/core/platform/app_platform_style.dart';
 import 'package:eduai/core/theme/app_theme.dart';
 import 'package:eduai/features/auth/presentation/screens/login_screen.dart';
 import 'package:eduai/features/auth/presentation/screens/offline_unlock_screen.dart';
@@ -21,7 +22,10 @@ void main() {
 
     await tester.pumpWidget(
       ProviderScope(
-        child: MaterialApp(theme: AppTheme.light(), home: screen),
+        child: MaterialApp(
+          theme: AppTheme.light(AppPlatformStyle.android),
+          home: screen,
+        ),
       ),
     );
     // Let the auth controller resolve its initial state.

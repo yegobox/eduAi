@@ -4,6 +4,7 @@ import '../../../core/config/config_providers.dart';
 import '../../../core/storage/secure_storage.dart';
 import '../data/datasources/firebase_phone_auth_data_source.dart';
 import '../data/datasources/offline_credential_store.dart';
+import '../data/datasources/profile_remote_data_source.dart';
 import '../data/datasources/supabase_auth_data_source.dart';
 import '../data/repositories/auth_repository_impl.dart';
 import '../domain/entities/auth_session.dart';
@@ -24,12 +25,19 @@ final offlineCredentialStoreProvider = Provider<OfflineCredentialStore>((ref) {
   return OfflineCredentialStore(ref.watch(secureStorageProvider));
 });
 
+/// Reads the server-side role. Separate from the auth data source because it
+/// talks to a table rather than to the auth API.
+final profileDataSourceProvider = Provider<ProfileRemoteDataSource>((ref) {
+  return ProfileRemoteDataSource(ref.watch(supabaseClientProvider));
+});
+
 /// The app-wide [AuthRepository]. Disposed with the container.
 final authRepositoryProvider = Provider<AuthRepository>((ref) {
   final repo = AuthRepositoryImpl(
     supabaseSource: ref.watch(_supabaseDataSourceProvider),
     phoneSource: ref.watch(_phoneDataSourceProvider),
     offlineStore: ref.watch(offlineCredentialStoreProvider),
+    profileSource: ref.watch(profileDataSourceProvider),
   );
   ref.onDispose(repo.dispose);
   return repo;

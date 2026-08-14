@@ -4,6 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/config/config_providers.dart';
+import '../../../../core/ink/ink_canvas.dart';
+import '../../../../core/ink/ink_controller.dart';
+import '../../../../core/ink/ink_stroke.dart';
+import '../../../../core/theme/app_tokens.dart';
+import '../../../../core/widgets/app_widgets.dart';
+import '../../../access/presentation/widgets/access_gate.dart';
 import '../../../progress/application/progress_providers.dart';
 import '../../application/tutor_controller.dart';
 import '../../application/tutor_state.dart';
@@ -19,6 +25,12 @@ const _samplePrompts = [
   'Why is the sky blue?',
 ];
 
+/// The prompt the scratchpad sends when working is attached. Fixed wording so
+/// the backend can recognise a handwriting turn.
+const kAttachedWorkingPrompt = 'Can you check my handwritten working?';
+
+/// Conversational tutor: user turns as brand bubbles, assistant turns as
+/// ordered blocks, plus a pen scratchpad for showing handwritten working.
 class TutorScreen extends ConsumerStatefulWidget {
   const TutorScreen({super.key});
 
@@ -29,11 +41,15 @@ class TutorScreen extends ConsumerStatefulWidget {
 class _TutorScreenState extends ConsumerState<TutorScreen> {
   final _inputController = TextEditingController();
   final _scrollController = ScrollController();
+  final _scratchpad = InkController();
+
+  bool _padOpen = false;
 
   @override
   void dispose() {
     _inputController.dispose();
     _scrollController.dispose();
+    _scratchpad.dispose();
     super.dispose();
   }
 
@@ -48,12 +64,32 @@ class _TutorScreenState extends ConsumerState<TutorScreen> {
   void _recordCheck(TutorCheckBlock block, bool correct) {
     final state = ref.read(tutorControllerProvider);
     unawaited(
-      ref.read(progressRecorderProvider).check(
+      ref
+          .read(progressRecorderProvider)
+          .check(
             correct: correct,
             question: block.question,
             subject: state.subject,
             level: state.level,
           ),
+    );
+  }
+
+  /// Subject / level sharpen the tutor's pitch and label progress events, so
+  /// the control stays reachable even though the redesigned shell has no
+  /// per-screen app-bar actions.
+  Future<void> _showContextSheet() async {
+    final state = ref.read(tutorControllerProvider);
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => _TunerSheet(
+        subject: state.subject,
+        level: state.level,
+        onSave: (subject, level) => ref
+            .read(tutorControllerProvider.notifier)
+            .setContext(subject: subject, level: level),
+      ),
     );
   }
 
@@ -75,141 +111,146 @@ class _TutorScreenState extends ConsumerState<TutorScreen> {
     final state = ref.watch(tutorControllerProvider);
     ref.listen(tutorControllerProvider, (_, _) => _scrollToBottom());
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('AI Tutor'),
-        actions: [
-          IconButton(
-            tooltip: 'Subject & level',
-            icon: const Icon(Icons.tune),
-            onPressed: () => _showContextSheet(context),
-          ),
-          IconButton(
-            tooltip: 'New conversation',
-            icon: const Icon(Icons.refresh),
-            onPressed: state.turns.isEmpty
-                ? null
-                : () => ref.read(tutorControllerProvider.notifier).reset(),
-          ),
-        ],
-      ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            if (!hasBackend) const _BackendUnconfiguredBanner(),
-            if (state.subject != null || state.level != null) _ContextBar(state: state),
-            Expanded(
-              child: state.turns.isEmpty
-                  ? _EmptyState(onPromptTap: _send)
-                  : Center(
-                      child: ConstrainedBox(
-                        constraints:
-                            const BoxConstraints(maxWidth: tutorMaxContentWidth),
-                        child: ListView.builder(
-                          controller: _scrollController,
-                          padding: const EdgeInsets.all(16),
-                          itemCount: state.turns.length,
-                          itemBuilder: (context, i) => _TurnTile(
-                            turn: state.turns[i],
-                            onFollowupTap: _send,
-                            onCheckAnswered: _recordCheck,
-                          ),
+    // The tutor is the expensive surface, so it is the one that stops when
+    // nobody is paying. Lessons, the workbook canvas and a student's own
+    // progress stay open — see AccessGate.
+    return AccessGate(
+      featureName: 'The AI Tutor',
+      child: Column(
+        children: [
+          if (!hasBackend) const _BackendUnconfiguredBanner(),
+          if (state.subject != null || state.level != null)
+            _ContextBar(state: state, onEdit: _showContextSheet),
+          Expanded(
+            child: state.turns.isEmpty
+                ? _EmptyState(onPromptTap: _send, onTune: _showContextSheet)
+                : Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(
+                        maxWidth: tutorMaxContentWidth,
+                      ),
+                      child: ListView.builder(
+                        controller: _scrollController,
+                        padding: const EdgeInsets.all(16),
+                        itemCount: state.turns.length,
+                        itemBuilder: (context, i) => _TurnTile(
+                          turn: state.turns[i],
+                          onFollowupTap: _send,
+                          onCheckAnswered: _recordCheck,
                         ),
                       ),
                     ),
+                  ),
+          ),
+          if (state.busy) const _ThinkingIndicator(),
+          if (state.failure != null)
+            _ErrorBanner(
+              message: state.failure!.message,
+              onDismiss: () =>
+                  ref.read(tutorControllerProvider.notifier).dismissError(),
             ),
-            if (state.busy) const _ThinkingIndicator(),
-            if (state.failure != null)
-              _ErrorBanner(
-                message: state.failure!.message,
-                onDismiss: () => ref.read(tutorControllerProvider.notifier).dismissError(),
-              ),
-            TutorComposer(
-              controller: _inputController,
-              busy: state.busy,
-              onSend: _send,
+          if (_padOpen)
+            _Scratchpad(
+              controller: _scratchpad,
+              onClose: () => setState(() => _padOpen = false),
+              onAttach: () {
+                _send(kAttachedWorkingPrompt);
+                _scratchpad.clear();
+                setState(() => _padOpen = false);
+              },
             ),
-          ],
-        ),
+          TutorComposer(
+            controller: _inputController,
+            busy: state.busy,
+            onSend: _send,
+            leading: ToolIconButton(
+              key: const Key('tutor-pen-button'),
+              icon: Icons.edit_outlined,
+              tooltip: 'Show your work with a pen',
+              active: _padOpen,
+              onPressed: () => setState(() => _padOpen = !_padOpen),
+            ),
+          ),
+        ],
       ),
     );
   }
+}
 
-  Future<void> _showContextSheet(BuildContext context) async {
-    final state = ref.read(tutorControllerProvider);
-    final subjectController = TextEditingController(text: state.subject ?? '');
-    final levelController = TextEditingController(text: state.level ?? '');
+/// The embedded handwriting pad above the composer — the bridge between
+/// free-hand maths and the chat.
+class _Scratchpad extends StatelessWidget {
+  const _Scratchpad({
+    required this.controller,
+    required this.onClose,
+    required this.onAttach,
+  });
 
-    try {
-      await _presentContextSheet(context, subjectController, levelController);
-    } finally {
-      subjectController.dispose();
-      levelController.dispose();
-    }
-  }
+  final InkController controller;
+  final VoidCallback onClose;
+  final VoidCallback onAttach;
 
-  Future<void> _presentContextSheet(
-    BuildContext context,
-    TextEditingController subjectController,
-    TextEditingController levelController,
-  ) async {
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      builder: (context) => Padding(
-        padding: EdgeInsets.only(
-          left: 24,
-          right: 24,
-          top: 24,
-          bottom: 24 + MediaQuery.of(context).viewInsets.bottom,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              'Tune your tutor',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+  @override
+  Widget build(BuildContext context) {
+    final t = AppTokens.read(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: tutorMaxContentWidth),
+          child: SunkenCard(
+            padding: const EdgeInsets.all(10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Show your work',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13,
+                          color: t.ink,
+                        ),
+                      ),
+                    ),
+                    ToolIconButton(
+                      icon: Icons.close,
+                      size: 28,
+                      tooltip: 'Close scratchpad',
+                      onPressed: onClose,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                SizedBox(
+                  height: 140,
+                  child: InkCanvas(
+                    key: const Key('tutor-scratchpad-canvas'),
+                    controller: controller,
+                    guide: InkGuide.grid,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    OutlinedButton(
+                      onPressed: controller.clear,
+                      child: const Text('Clear'),
+                    ),
+                    FilledButton(
+                      key: const Key('tutor-attach-button'),
+                      onPressed: onAttach,
+                      child: const Text('Attach & ask'),
+                    ),
+                  ],
+                ),
+              ],
             ),
-            const SizedBox(height: 4),
-            Text(
-              'Helps the tutor pitch explanations at the right level.',
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
-            const SizedBox(height: 20),
-            TextField(
-              controller: subjectController,
-              decoration: const InputDecoration(
-                labelText: 'Subject (optional)',
-                hintText: 'e.g. algebra, biology',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: levelController,
-              decoration: const InputDecoration(
-                labelText: 'Level (optional)',
-                hintText: 'e.g. grade 6, beginner',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 20),
-            FilledButton(
-              onPressed: () {
-                ref.read(tutorControllerProvider.notifier).setContext(
-                      subject: subjectController.text.trim().isEmpty
-                          ? null
-                          : subjectController.text.trim(),
-                      level: levelController.text.trim().isEmpty
-                          ? null
-                          : levelController.text.trim(),
-                    );
-                Navigator.of(context).pop();
-              },
-              child: const Text('Save'),
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -221,23 +262,25 @@ class _BackendUnconfiguredBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    final t = AppTokens.read(context);
     return Container(
       width: double.infinity,
-      color: scheme.errorContainer,
+      color: t.warningSoft,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       child: Text(
-        'The AI tutor backend isn\'t configured for this build (DATA_CONNECTOR_URL missing).',
-        style: TextStyle(color: scheme.onErrorContainer),
+        "The AI tutor backend isn't configured for this build "
+        '(DATA_CONNECTOR_URL missing).',
+        style: TextStyle(color: t.warning, fontSize: 13),
       ),
     );
   }
 }
 
 class _ContextBar extends StatelessWidget {
-  const _ContextBar({required this.state});
+  const _ContextBar({required this.state, required this.onEdit});
 
   final TutorChatState state;
+  final VoidCallback onEdit;
 
   @override
   Widget build(BuildContext context) {
@@ -246,8 +289,10 @@ class _ContextBar extends StatelessWidget {
       child: Wrap(
         spacing: 8,
         children: [
-          if (state.subject != null) Chip(label: Text(state.subject!)),
-          if (state.level != null) Chip(label: Text(state.level!)),
+          if (state.subject != null)
+            SoftChip(state.subject!, tone: AppTone.brand, onTap: onEdit),
+          if (state.level != null)
+            SoftChip(state.level!, tone: AppTone.brand, onTap: onEdit),
         ],
       ),
     );
@@ -255,43 +300,55 @@ class _ContextBar extends StatelessWidget {
 }
 
 class _EmptyState extends StatelessWidget {
-  const _EmptyState({required this.onPromptTap});
+  const _EmptyState({required this.onPromptTap, required this.onTune});
 
   final ValueChanged<String> onPromptTap;
+  final VoidCallback onTune;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final t = AppTokens.read(context);
     return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 560),
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.psychology_outlined, size: 56, color: theme.colorScheme.primary),
-              const SizedBox(height: 16),
+              const IconTile(icon: Icons.auto_awesome, size: 64, iconSize: 26),
+              const SizedBox(height: 14),
               Text(
-                'Ask me anything you\'re studying',
-                style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+                "Ask me anything you're studying",
                 textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 19,
+                  color: t.ink,
+                ),
               ),
               const SizedBox(height: 8),
               Text(
-                'I\'ll explain step by step and check your understanding along the way.',
-                style: theme.textTheme.bodyMedium,
+                "I'll explain step by step and check your understanding along "
+                'the way.',
                 textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 14, color: t.ink2),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 18),
               Wrap(
                 alignment: WrapAlignment.center,
                 spacing: 8,
                 runSpacing: 8,
                 children: [
                   for (final prompt in _samplePrompts)
-                    ActionChip(label: Text(prompt), onPressed: () => onPromptTap(prompt)),
+                    PromptChip(prompt, onTap: () => onPromptTap(prompt)),
                 ],
+              ),
+              const SizedBox(height: 14),
+              TextButton.icon(
+                onPressed: onTune,
+                icon: const Icon(Icons.tune, size: 16),
+                label: const Text('Set subject & level'),
               ),
             ],
           ),
@@ -314,42 +371,46 @@ class _TurnTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = AppTokens.read(context);
     return switch (turn) {
       TutorUserTurn(text: final text) => Align(
-          alignment: Alignment.centerRight,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 480),
-            child: Card(
-              color: Theme.of(context).colorScheme.primaryContainer,
-              margin: const EdgeInsets.symmetric(vertical: 6),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                child: Text(
-                  text,
-                  style: TextStyle(color: Theme.of(context).colorScheme.onPrimaryContainer),
-                ),
+        alignment: Alignment.centerRight,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 480),
+          child: Container(
+            margin: const EdgeInsets.symmetric(vertical: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 11),
+            decoration: BoxDecoration(
+              color: t.brand,
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(16),
+                topRight: Radius.circular(16),
+                bottomLeft: Radius.circular(16),
+                bottomRight: Radius.circular(4),
               ),
             ),
+            child: Text(text, style: TextStyle(color: t.onBrand, fontSize: 15)),
           ),
         ),
+      ),
       TutorAssistantTurn(blocks: final blocks) => Padding(
-          padding: const EdgeInsets.symmetric(vertical: 6),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              for (final block in blocks)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 6),
-                  child: TutorBlockView(
-                    block: block,
-                    onFollowupTap: onFollowupTap,
-                    onCheckAnswered: onCheckAnswered,
-                  ),
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (final block in blocks)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: TutorBlockView(
+                  block: block,
+                  onFollowupTap: onFollowupTap,
+                  onCheckAnswered: onCheckAnswered,
                 ),
-            ],
-          ),
+              ),
+          ],
         ),
+      ),
     };
   }
 }
@@ -359,17 +420,21 @@ class _ThinkingIndicator extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Padding(
-      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+    final t = AppTokens.read(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
       child: Row(
         children: [
-          SizedBox(
+          const SizedBox(
             width: 16,
             height: 16,
             child: CircularProgressIndicator(strokeWidth: 2),
           ),
-          SizedBox(width: 12),
-          Text('Thinking it through…'),
+          const SizedBox(width: 12),
+          Text(
+            'Thinking it through…',
+            style: TextStyle(fontSize: 13, color: t.ink2),
+          ),
         ],
       ),
     );
@@ -384,16 +449,21 @@ class _ErrorBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    final t = AppTokens.read(context);
     return Container(
       width: double.infinity,
-      color: scheme.errorContainer,
+      color: t.dangerSoft,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       child: Row(
         children: [
-          Expanded(child: Text(message, style: TextStyle(color: scheme.onErrorContainer))),
+          Expanded(
+            child: Text(
+              message,
+              style: TextStyle(color: t.danger, fontSize: 13),
+            ),
+          ),
           IconButton(
-            icon: Icon(Icons.close, color: scheme.onErrorContainer, size: 18),
+            icon: Icon(Icons.close, color: t.danger, size: 18),
             onPressed: onDismiss,
           ),
         ],
@@ -402,3 +472,92 @@ class _ErrorBanner extends StatelessWidget {
   }
 }
 
+/// Subject / level entry. A StatefulWidget so the sheet owns its text
+/// controllers: disposing them from the caller kills them while the sheet is
+/// still animating out, and the fields then throw mid-dismiss.
+class _TunerSheet extends StatefulWidget {
+  const _TunerSheet({
+    required this.subject,
+    required this.level,
+    required this.onSave,
+  });
+
+  final String? subject;
+  final String? level;
+  final void Function(String? subject, String? level) onSave;
+
+  @override
+  State<_TunerSheet> createState() => _TunerSheetState();
+}
+
+class _TunerSheetState extends State<_TunerSheet> {
+  late final _subject = TextEditingController(text: widget.subject ?? '');
+  late final _level = TextEditingController(text: widget.level ?? '');
+
+  @override
+  void dispose() {
+    _subject.dispose();
+    _level.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppTokens.read(context);
+    return Padding(
+      padding: EdgeInsets.only(
+        left: 24,
+        right: 24,
+        top: 24,
+        bottom: 24 + MediaQuery.of(context).viewInsets.bottom,
+      ),
+      // Scrollable: on a short phone with the keyboard up there is not enough
+      // room for two fields plus the save button.
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const SectionTitle('Tune your tutor'),
+            const SizedBox(height: 4),
+            Text(
+              'Helps the tutor pitch explanations at the right level.',
+              style: TextStyle(color: t.ink2),
+            ),
+            const SizedBox(height: 20),
+            TextField(
+              key: const Key('tutor-subject-field'),
+              controller: _subject,
+              decoration: const InputDecoration(
+                labelText: 'Subject (optional)',
+                hintText: 'e.g. algebra, biology',
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              key: const Key('tutor-level-field'),
+              controller: _level,
+              decoration: const InputDecoration(
+                labelText: 'Level (optional)',
+                hintText: 'e.g. P6, O-Level',
+              ),
+            ),
+            const SizedBox(height: 20),
+            FilledButton(
+              onPressed: () {
+                final subject = _subject.text.trim();
+                final level = _level.text.trim();
+                widget.onSave(
+                  subject.isEmpty ? null : subject,
+                  level.isEmpty ? null : level,
+                );
+                Navigator.of(context).pop();
+              },
+              child: const Text('Save'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

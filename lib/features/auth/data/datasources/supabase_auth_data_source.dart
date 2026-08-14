@@ -73,15 +73,19 @@ class SupabaseAuthDataSource {
     return session;
   }
 
+  /// [roleWireName] travels as sign-up metadata, where the `handle_new_user`
+  /// trigger reads it. The trigger validates it rather than trusting it, so a
+  /// modified client cannot mint itself an admin account this way.
   Future<AppUser> signUpWithEmail({
     required String email,
     required String password,
+    required String roleWireName,
     String? displayName,
   }) async {
     final res = await _c.auth.signUp(
       email: email.trim(),
       password: password,
-      data: displayName == null ? null : {'display_name': displayName},
+      data: {'role': roleWireName, 'display_name': ?displayName},
     );
     final user = _mapUser(res.user);
     if (user == null) {

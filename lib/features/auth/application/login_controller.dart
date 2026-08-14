@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/error/failure.dart';
 import '../../../core/error/result.dart';
+import '../domain/entities/app_role.dart';
 import '../domain/entities/app_user.dart';
 import '../domain/entities/auth_session.dart';
 import 'auth_providers.dart';
@@ -29,12 +30,14 @@ class LoginController extends AutoDisposeNotifier<AuthActionState> {
   Future<Result<AppUser>> signUp({
     required String email,
     required String password,
+    required AppRole role,
     String? displayName,
   }) async {
     state = const AuthActionState.loading();
     final result = await ref.read(authRepositoryProvider).signUpWithEmail(
           email: email,
           password: password,
+          role: role,
           displayName: displayName,
         );
     _settle(result.failureOrNull);

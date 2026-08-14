@@ -1,3 +1,4 @@
+import 'package:eduai/core/widgets/app_widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -7,19 +8,22 @@ import 'support/harness.dart';
 void main() {
   Future<void> signIn(WidgetTester tester) async {
     await tester.enterText(
-        find.byType(TextFormField).at(0), 'teacher@eduai.dev');
+      find.byType(TextFormField).at(0),
+      'teacher@eduai.dev',
+    );
     await tester.enterText(find.byType(TextFormField).at(1), 'password123');
     await tester.tap(find.text('Sign in'));
     await tester.pumpAndSettle();
   }
 
   group('Schools flow', () {
-    testWidgets('browse → open school → join a class → shows on home',
-        (tester) async {
+    testWidgets('browse → open school → join a class → shows on home', (
+      tester,
+    ) async {
       await pumpApp(tester, auth: FakeAuthRepository());
       await signIn(tester);
 
-      await tester.tap(find.text('Browse schools'));
+      await tester.tap(find.text('Browse'));
       await tester.pumpAndSettle();
       expect(find.text('Schools'), findsOneWidget);
       expect(find.text('Kigali Modern Academy'), findsWidgets);
@@ -30,12 +34,14 @@ void main() {
 
       final classCard = find.ancestor(
         of: find.text('P5 — Maths'),
-        matching: find.byType(Card),
+        matching: find.byType(AppCard),
       );
-      await tester.tap(find.descendant(
-        of: classCard,
-        matching: find.widgetWithText(FilledButton, 'Join'),
-      ));
+      await tester.tap(
+        find.descendant(
+          of: classCard,
+          matching: find.widgetWithText(FilledButton, 'Join'),
+        ),
+      );
       await tester.pumpAndSettle();
 
       // Class now reads as joined.
@@ -54,12 +60,13 @@ void main() {
       expect(find.text('Kigali Modern Academy'), findsWidgets);
     });
 
-    testWidgets('valid join code enrols and marks the school joined',
-        (tester) async {
+    testWidgets('valid join code enrols and marks the school joined', (
+      tester,
+    ) async {
       await pumpApp(tester, auth: FakeAuthRepository());
       await signIn(tester);
 
-      await tester.tap(find.text('Browse schools'));
+      await tester.tap(find.text('Browse'));
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('Join by code'));
@@ -71,15 +78,17 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Join with a code'), findsNothing); // dialog closed
-      expect(find.text('Joined'), findsWidgets);
+      // The badge renders uppercase as a visual treatment.
+      expect(find.text('JOINED'), findsWidgets);
     });
 
-    testWidgets('invalid join code shows an error and keeps the dialog open',
-        (tester) async {
+    testWidgets('invalid join code shows an error and keeps the dialog open', (
+      tester,
+    ) async {
       await pumpApp(tester, auth: FakeAuthRepository());
       await signIn(tester);
 
-      await tester.tap(find.text('Browse schools'));
+      await tester.tap(find.text('Browse'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Join by code'));
       await tester.pumpAndSettle();
@@ -90,7 +99,9 @@ void main() {
       await tester.pump(const Duration(milliseconds: 400));
 
       expect(
-          find.text('No school or class matches that code.'), findsOneWidget);
+        find.text('No school or class matches that code.'),
+        findsOneWidget,
+      );
       expect(find.text('Join with a code'), findsOneWidget); // still open
     });
   });

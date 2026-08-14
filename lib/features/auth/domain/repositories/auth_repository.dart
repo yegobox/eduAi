@@ -1,4 +1,5 @@
 import '../../../../core/error/result.dart';
+import '../entities/app_role.dart';
 import '../entities/app_user.dart';
 import '../entities/auth_session.dart';
 import '../entities/phone_otp_challenge.dart';
@@ -23,13 +24,26 @@ abstract interface class AuthRepository {
     required String password,
   });
 
+  /// Creates an account. [role] decides which product surface the identity
+  /// gets and is sent as sign-up metadata; the server validates it against an
+  /// allowlist and pins it on `profiles`, so this is a request, not a grant.
   Future<Result<AppUser>> signUpWithEmail({
     required String email,
     required String password,
+    required AppRole role,
     String? displayName,
   });
 
   Future<Result<void>> sendPasswordReset(String email);
+
+  /// Remembers the Mobile Money number an account just paid with, so the
+  /// payment sheet can pre-fill it next time.
+  ///
+  /// An email sign-up has no phone number on its identity, which is why the
+  /// number has to be captured from the payment itself rather than assumed to
+  /// be on the account already. Best-effort: failing to remember it must never
+  /// affect a payment that has already settled.
+  Future<void> rememberPayerPhone(String phoneNumber);
 
   // ---- Online: Firebase phone (SMS) -------------------------------------
 

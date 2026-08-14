@@ -15,11 +15,14 @@ void main() {
       expect(find.text('Sign in'), findsOneWidget);
     });
 
-    testWidgets('wrong password is rejected and stays on login',
-        (tester) async {
+    testWidgets('wrong password is rejected and stays on login', (
+      tester,
+    ) async {
       await pumpApp(tester);
       await tester.enterText(
-          find.byType(TextFormField).at(0), 'teacher@eduai.dev');
+        find.byType(TextFormField).at(0),
+        'teacher@eduai.dev',
+      );
       await tester.enterText(find.byType(TextFormField).at(1), 'wrongpass');
       await tester.tap(find.text('Sign in'));
       await tester.pump();
@@ -29,11 +32,12 @@ void main() {
       expect(find.text('Welcome back'), findsOneWidget);
     });
 
-    testWidgets('correct credentials sign in and land on home',
-        (tester) async {
+    testWidgets('correct credentials sign in and land on home', (tester) async {
       await pumpApp(tester);
       await tester.enterText(
-          find.byType(TextFormField).at(0), 'teacher@eduai.dev');
+        find.byType(TextFormField).at(0),
+        'teacher@eduai.dev',
+      );
       await tester.enterText(find.byType(TextFormField).at(1), 'password123');
       await tester.tap(find.text('Sign in'));
       await tester.pumpAndSettle();
@@ -41,8 +45,9 @@ void main() {
       expect(find.textContaining('Hello, Teacher'), findsOneWidget);
     });
 
-    testWidgets('offline: wrong PIN is rejected on the unlock screen',
-        (tester) async {
+    testWidgets('offline: wrong PIN is rejected on the unlock screen', (
+      tester,
+    ) async {
       await pumpApp(
         tester,
         network: NetworkStatus.offline,
@@ -81,22 +86,25 @@ void main() {
       expect(find.textContaining('Hello'), findsOneWidget);
     });
 
-    testWidgets('set an offline PIN, then sign out requires offline unlock',
-        (tester) async {
+    testWidgets('set an offline PIN, then sign out requires offline unlock', (
+      tester,
+    ) async {
       await pumpApp(tester);
 
       // Sign in.
       await tester.enterText(
-          find.byType(TextFormField).at(0), 'teacher@eduai.dev');
+        find.byType(TextFormField).at(0),
+        'teacher@eduai.dev',
+      );
       await tester.enterText(find.byType(TextFormField).at(1), 'password123');
       await tester.tap(find.text('Sign in'));
       await tester.pumpAndSettle();
       expect(find.textContaining('Hello, Teacher'), findsOneWidget);
 
-      // Overflow menu → Set/change offline PIN.
-      await tester.tap(find.byType(PopupMenuButton<String>));
+      // Overflow menu → Set / change offline PIN.
+      await tester.tap(find.byIcon(Icons.more_vert));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Set/change offline PIN'));
+      await tester.tap(find.text('Set / change offline PIN'));
       await tester.pumpAndSettle();
       expect(find.text('Set an offline PIN'), findsOneWidget);
 
@@ -107,7 +115,7 @@ void main() {
       expect(find.textContaining('Hello, Teacher'), findsOneWidget);
 
       // Sign out → a PIN now exists, so we land on offline unlock.
-      await tester.tap(find.byType(PopupMenuButton<String>));
+      await tester.tap(find.byIcon(Icons.more_vert));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Sign out'));
       await tester.pumpAndSettle();

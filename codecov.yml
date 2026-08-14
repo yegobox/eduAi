@@ -1,0 +1,25 @@
+coverage:
+  status:
+    # Overall repo coverage: don't fail the build, just report the trend.
+    project:
+      default:
+        target: auto
+        threshold: 2%
+        informational: true
+    # Coverage of the lines the PR actually touches.
+    patch:
+      default:
+        target: 60%
+        threshold: 5%
+        informational: true
+
+comment:
+  layout: "reach, diff, flags, files"
+  behavior: default
+  require_changes: true
+
+ignore:
+  - "lib/main.dart"
+  - "**/*.g.dart"
+  - "**/*.freezed.dart"
+  - "test/**"

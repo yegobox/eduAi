@@ -20,7 +20,12 @@ class TutorComposer extends StatefulWidget {
     required this.controller,
     required this.busy,
     required this.onSend,
+    this.leading,
   });
+
+  /// Optional control shown left of the field — the pen button that opens the
+  /// handwriting scratchpad.
+  final Widget? leading;
 
   final TextEditingController controller;
 
@@ -59,7 +64,8 @@ class _TutorComposerState extends State<TutorComposer> {
   KeyEventResult _onKeyEvent(FocusNode node, KeyEvent event) {
     if (event is! KeyDownEvent) return KeyEventResult.ignored;
 
-    final isEnter = event.logicalKey == LogicalKeyboardKey.enter ||
+    final isEnter =
+        event.logicalKey == LogicalKeyboardKey.enter ||
         event.logicalKey == LogicalKeyboardKey.numpadEnter;
     if (!isEnter) return KeyEventResult.ignored;
 
@@ -95,6 +101,14 @@ class _TutorComposerState extends State<TutorComposer> {
                   return Row(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
+                      if (widget.leading != null) ...[
+                        // Aligned with the field, above the helper line.
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 24),
+                          child: widget.leading!,
+                        ),
+                        const SizedBox(width: 8),
+                      ],
                       Expanded(child: _buildField(context)),
                       const SizedBox(width: 8),
                       _SendButton(
@@ -118,9 +132,9 @@ class _TutorComposerState extends State<TutorComposer> {
     final radius = BorderRadius.circular(22);
 
     OutlineInputBorder border(Color color, double width) => OutlineInputBorder(
-          borderRadius: radius,
-          borderSide: BorderSide(color: color, width: width),
-        );
+      borderRadius: radius,
+      borderSide: BorderSide(color: color, width: width),
+    );
 
     return TextField(
       controller: widget.controller,
@@ -137,14 +151,16 @@ class _TutorComposerState extends State<TutorComposer> {
       decoration: InputDecoration(
         hintText: 'Ask a question…',
         helperText: 'Enter to send · Shift+Enter for a new line',
-        helperStyle: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: scheme.onSurfaceVariant,
-            ),
+        helperStyle: Theme.of(
+          context,
+        ).textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
         filled: true,
         fillColor: scheme.surfaceContainerHighest,
         isDense: true,
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 12,
+        ),
         border: border(Colors.transparent, 0),
         enabledBorder: border(Colors.transparent, 0),
         focusedBorder: border(scheme.primary, 1.5),

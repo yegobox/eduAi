@@ -8,16 +8,19 @@ import 'support/harness.dart';
 void main() {
   Future<void> signIn(WidgetTester tester) async {
     await tester.enterText(
-        find.byType(TextFormField).at(0), 'teacher@eduai.dev');
+      find.byType(TextFormField).at(0),
+      'teacher@eduai.dev',
+    );
     await tester.enterText(find.byType(TextFormField).at(1), 'password123');
     await tester.tap(find.text('Sign in'));
     await tester.pumpAndSettle();
   }
 
   Future<void> openTutor(WidgetTester tester) async {
+    // Jump via the Home card, which routes to the Tutor tab.
     await tester.tap(find.text('AI Tutor'));
     await tester.pumpAndSettle();
-    expect(find.widgetWithText(AppBar, 'AI Tutor'), findsOneWidget);
+    expect(find.text("Ask me anything you're studying"), findsOneWidget);
   }
 
   group('Tutor flow', () {
@@ -43,8 +46,9 @@ void main() {
       expect(tutor.askedMessages, ['Why is the sky blue?']);
     });
 
-    testWidgets('selecting the correct check answer reveals the explanation',
-        (tester) async {
+    testWidgets('selecting the correct check answer reveals the explanation', (
+      tester,
+    ) async {
       await pumpApp(tester, auth: FakeAuthRepository());
       await signIn(tester);
       await openTutor(tester);
@@ -67,8 +71,9 @@ void main() {
       );
     });
 
-    testWidgets('tapping a follow-up chip sends it as the next question',
-        (tester) async {
+    testWidgets('tapping a follow-up chip sends it as the next question', (
+      tester,
+    ) async {
       final tutor = FakeTutorRepository();
       await pumpApp(tester, auth: FakeAuthRepository(), tutor: tutor);
       await signIn(tester);
@@ -88,8 +93,9 @@ void main() {
       expect(tutor.historySeenPerCall[1], hasLength(2));
     });
 
-    testWidgets('a repository failure shows a dismissible error banner',
-        (tester) async {
+    testWidgets('a repository failure shows a dismissible error banner', (
+      tester,
+    ) async {
       await pumpApp(
         tester,
         auth: FakeAuthRepository(),

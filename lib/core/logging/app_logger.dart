@@ -26,5 +26,14 @@ class AppLogger {
       error: error,
       stackTrace: stack,
     );
+
+    // `developer.log` alone reaches the VM service — DevTools' Logging tab —
+    // but not the `flutter run` terminal, which is where anybody debugging a
+    // failed payment is actually looking. Mirroring warnings and errors to
+    // debugPrint makes them visible there and in the browser console, at the
+    // cost of a duplicate line in DevTools.
+    if (kReleaseMode || level == 'DEBUG' || level == 'INFO') return;
+    debugPrint('[$_tag/$level] $message');
+    if (error != null) debugPrint('[$_tag/$level]   cause: $error');
   }
 }
