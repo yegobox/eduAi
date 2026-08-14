@@ -50,6 +50,10 @@ class LinkingRepositoryImpl implements LinkingRepository {
   }
 
   @override
+  Future<Result<FamilyInvite>> inviteTeacher({String? contact}) =>
+      _run(() => _remote.inviteTeacher(contact: _clean(contact)));
+
+  @override
   Future<Result<void>> redeemCode(String code) {
     final normalized = code.trim().toUpperCase();
     if (normalized.length < 4) {

@@ -24,6 +24,10 @@ abstract interface class LinkingRepository {
     String? contact,
   });
 
+  /// School side: mint a code that turns the redeeming account into a teacher
+  /// of this school. Refused by the server unless the caller is the admin.
+  Future<Result<FamilyInvite>> inviteTeacher({String? contact});
+
   /// Redeems either kind of code. Which side of the link the signed-in account
   /// supplies is decided by the invite, not by the caller.
   Future<Result<void>> redeemCode(String code);

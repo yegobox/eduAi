@@ -246,7 +246,16 @@ class SchoolsRepositoryImpl implements SchoolsRepository {
     }
     if (error is PostgrestException) {
       if (error.code == '23505') {
-        return const ValidationFailure("You've already joined that.");
+        // The same code covers two very different collisions: a duplicate
+        // membership, and a join code somebody else already uses. Telling an
+        // admin naming a class "You've already joined that" explains nothing.
+        final duplicateCode = error.message.toLowerCase().contains('join_code');
+        return ValidationFailure(
+          duplicateCode
+              ? 'That join code is already taken — try another.'
+              : "You've already joined that.",
+          cause: error,
+        );
       }
       return AuthFailure(error.message, cause: error);
     }

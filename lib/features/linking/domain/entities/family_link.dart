@@ -8,16 +8,22 @@ enum InviteKind {
 
   /// A parent invites their own child. The parent holds the code; the student
   /// redeems it.
-  studentOfParent;
+  studentOfParent,
+
+  /// A school employs a teacher. The school holds the code; the teacher
+  /// redeems it, which is the only way the teacher role is ever granted.
+  teacherOfSchool;
 
   String get wireName => switch (this) {
     InviteKind.parentOfStudent => 'parent_of_student',
     InviteKind.studentOfParent => 'student_of_parent',
+    InviteKind.teacherOfSchool => 'teacher_of_school',
   };
 
   static InviteKind fromWire(String? value) =>
       switch (value?.trim().toLowerCase()) {
         'parent_of_student' => InviteKind.parentOfStudent,
+        'teacher_of_school' => InviteKind.teacherOfSchool,
         _ => InviteKind.studentOfParent,
       };
 }

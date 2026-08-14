@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../application/schools_action_controller.dart';
+import '../../domain/join_code.dart';
 
 /// Prompt for a join code and enrol the user. Returns true on success.
 Future<bool> showJoinByCodeDialog(BuildContext context) async {
@@ -184,7 +185,9 @@ class _CreateClassDialog extends ConsumerStatefulWidget {
 class _CreateClassDialogState extends ConsumerState<_CreateClassDialog> {
   final _name = TextEditingController();
   final _grade = TextEditingController();
-  final _code = TextEditingController();
+  // Pre-filled: a class with no code cannot be joined, and an admin who leaves
+  // the field blank has no way to enrol anybody and nothing telling them why.
+  final _code = TextEditingController(text: JoinCode.suggest());
   bool _busy = false;
 
   @override
@@ -237,10 +240,15 @@ class _CreateClassDialogState extends ConsumerState<_CreateClassDialog> {
           ),
           const SizedBox(height: 12),
           TextField(
+            key: const Key('class-join-code-field'),
             controller: _code,
             textCapitalization: TextCapitalization.characters,
-            decoration:
-                const InputDecoration(labelText: 'Join code (optional)'),
+            decoration: const InputDecoration(
+              labelText: 'Join code',
+              helperText: 'Students type this once to enrol. Edit it if you '
+                  'already use a code.',
+              helperMaxLines: 2,
+            ),
           ),
         ],
       ),

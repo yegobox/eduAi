@@ -31,6 +31,9 @@ import '../../features/progress/presentation/screens/progress_screen.dart';
 import '../../features/schools/domain/entities/school.dart';
 import '../../features/schools/presentation/screens/school_detail_screen.dart';
 import '../../features/schools/presentation/screens/schools_list_screen.dart';
+import '../../features/teacher/presentation/screens/teacher_class_screen.dart';
+import '../../features/teacher/presentation/screens/teacher_classes_screen.dart';
+import '../../features/teacher/presentation/screens/teacher_progress_screen.dart';
 import '../../features/tutor/presentation/screens/tutor_screen.dart';
 import '../../features/workbook/presentation/screens/workbook_screen.dart';
 import 'app_routes.dart';
@@ -118,6 +121,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         ParentMessagesScreen(),
         ParentPlanScreen(),
       ]),
+      _shell(ShellTabs.teacher, const [
+        TeacherClassesScreen(),
+        TeacherProgressScreen(),
+      ]),
       _shell(ShellTabs.schoolAdmin, const [
         AdminLicenseScreen(),
         AdminSeatsScreen(),
@@ -148,6 +155,12 @@ final routerProvider = Provider<GoRouter>((ref) {
           schoolId: state.pathParameters['id']!,
           school: state.extra is School ? state.extra as School : null,
         ),
+      ),
+      GoRoute(
+        path: '/teacher/class/:id',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (_, state) =>
+            TeacherClassScreen(classId: state.pathParameters['id']!),
       ),
       GoRoute(
         path: '/lesson/:id',

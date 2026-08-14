@@ -12,6 +12,7 @@ import 'package:eduai/features/auth/domain/entities/app_role.dart';
 import 'package:eduai/features/linking/application/linking_providers.dart';
 import 'package:eduai/features/payments/application/momo_payment_controller.dart';
 import 'package:eduai/features/schools/application/schools_providers.dart';
+import 'package:eduai/features/teacher/application/teacher_providers.dart';
 import 'package:eduai/features/tutor/application/tutor_providers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -30,6 +31,7 @@ class AppUnderTest {
     this.http,
     this.access,
     this.linking,
+    this.teacher,
   );
 
   final FakeAuthRepository auth;
@@ -38,6 +40,7 @@ class AppUnderTest {
   final RecordingHttpClient http;
   final FakeAccessRepository access;
   final FakeLinkingRepository linking;
+  final FakeTeacherRepository teacher;
 }
 
 /// Config with Mobile Money and the tutor backend wired to loopback hosts.
@@ -63,12 +66,16 @@ List<Override> testOverrides({
   required RecordingHttpClient httpClient,
   FakeAccessRepository? access,
   FakeLinkingRepository? linking,
+  FakeTeacherRepository? teacher,
   NetworkStatus network = NetworkStatus.online,
   AppPlatformStyle platform = AppPlatformStyle.android,
   AppRole? role,
   AppConfig config = testConfig,
 }) {
   return [
+    teacherRepositoryProvider.overrideWithValue(
+      teacher ?? FakeTeacherRepository(),
+    ),
     appConfigProvider.overrideWithValue(config),
     authRepositoryProvider.overrideWithValue(auth),
     schoolsRepositoryProvider.overrideWithValue(schools),
@@ -102,6 +109,7 @@ Future<AppUnderTest> pumpApp(
   RecordingHttpClient? httpClient,
   FakeAccessRepository? access,
   FakeLinkingRepository? linking,
+  FakeTeacherRepository? teacher,
   NetworkStatus network = NetworkStatus.online,
   AppPlatformStyle platform = AppPlatformStyle.android,
   AppRole? role,
@@ -120,6 +128,7 @@ Future<AppUnderTest> pumpApp(
   // was paid for.
   final fakeAccess = access ?? FakeAccessRepository();
   final fakeLinking = linking ?? FakeLinkingRepository();
+  final fakeTeacher = teacher ?? FakeTeacherRepository();
 
   setSurfaceSize(tester, size);
 
@@ -133,6 +142,7 @@ Future<AppUnderTest> pumpApp(
           httpClient: fakeHttp,
           access: fakeAccess,
           linking: fakeLinking,
+          teacher: fakeTeacher,
           network: network,
           platform: platform,
           role: role,
@@ -151,6 +161,7 @@ Future<AppUnderTest> pumpApp(
     fakeHttp,
     fakeAccess,
     fakeLinking,
+    fakeTeacher,
   );
 }
 

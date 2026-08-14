@@ -96,6 +96,11 @@ class LinkingRemoteDataSource {
     return FamilyInvite.fromJson(_asMap(raw));
   }
 
+  Future<FamilyInvite> inviteTeacher({String? contact}) async {
+    final raw = await _c.rpc('invite_teacher', params: {'p_contact': contact});
+    return FamilyInvite.fromJson(_asMap(raw));
+  }
+
   Future<void> redeemCode(String code) async {
     await _c.rpc('redeem_invite', params: {'p_code': code});
   }

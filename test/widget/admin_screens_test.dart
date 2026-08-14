@@ -6,6 +6,7 @@ import 'package:eduai/features/auth/domain/entities/auth_session.dart';
 import 'package:eduai/features/linking/domain/entities/family_link.dart';
 import 'package:eduai/features/payments/application/momo_payment_controller.dart';
 import 'package:eduai/features/payments/domain/entities/momo_payment.dart';
+import 'package:eduai/features/schools/domain/join_code.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -74,12 +75,14 @@ Future<AppUnderTest> pumpAdmin(
   Size size = desktopSize,
   AccessState? access,
   List<RosterEntry>? roster,
+  FakeSchoolsRepository? schools,
 }) {
   return pumpApp(
     tester,
     auth: FakeAuthRepository(initialSession: _adminSession),
     access: FakeAccessRepository(state: access ?? _activeLicense()),
     linking: FakeLinkingRepository(roster: roster ?? _roster),
+    schools: schools,
     platform: platform,
     size: size,
   );
@@ -88,6 +91,19 @@ Future<AppUnderTest> pumpAdmin(
 Future<void> openTab(WidgetTester tester, String label) async {
   await tester.tap(find.text(label).last);
   await tester.pumpAndSettle();
+}
+
+/// Drags the People list until [finder] is built.
+///
+/// The roster sits below the seats, classes and teachers cards, and a ListView
+/// only builds what is near the viewport. `scrollUntilVisible` cannot be used:
+/// the shell nests more than one Scrollable, so it cannot pick one.
+Future<void> scrollTo(WidgetTester tester, Finder finder) async {
+  final list = find.byType(ListView).last;
+  for (var i = 0; i < 12 && finder.evaluate().isEmpty; i++) {
+    await tester.drag(list, const Offset(0, -300));
+    await tester.pumpAndSettle();
+  }
 }
 
 void main() {
@@ -256,6 +272,8 @@ void main() {
       await openTab(tester, 'People');
 
       expect(find.text('3 ENROLLED'), findsOneWidget);
+      await scrollTo(tester, find.text('Chantal M.'));
+
       expect(find.text('Alice K.'), findsOneWidget);
       expect(find.text('Primary 6 — English'), findsOneWidget);
       // Alice has a parent, Chantal has an open invite, Jean has neither.
@@ -271,6 +289,7 @@ void main() {
       final app = await pumpAdmin(tester);
       await openTab(tester, 'People');
 
+      await scrollTo(tester, find.byKey(const Key('invite-parent-st2')));
       await tester.tap(find.byKey(const Key('invite-parent-st2')));
       await tester.pumpAndSettle();
       await tester.enterText(
@@ -308,19 +327,83 @@ void main() {
       expect(app.access.lastSeats, 145);
     });
 
-    testWidgets('an empty roster explains how students arrive', (tester) async {
-      await pumpAdmin(tester, roster: const []);
-      await openTab(tester, 'People');
-
-      expect(find.text('No students enrolled yet'), findsOneWidget);
-      expect(find.textContaining('share their join codes'), findsOneWidget);
-    });
+    // The empty-roster copy is asserted in "A paid director can actually run
+    // the school", which also checks it no longer points at an unreachable page.
 
     testWidgets('no school means no roster to show', (tester) async {
       await pumpAdmin(tester, access: _noSchool);
       await openTab(tester, 'People');
 
       expect(find.text('No school yet'), findsOneWidget);
+    });
+  });
+
+  group('A paid director can actually run the school', () {
+    testWidgets('classes and their join codes are on the People tab', (
+      tester,
+    ) async {
+      // The blocker this fixes: every route into the school pages ran through
+      // the *student* shell, so a director who had paid had no way to create a
+      // class — and the roster's empty state pointed at a page they could not
+      // open.
+      await pumpAdmin(tester);
+      await openTab(tester, 'People');
+
+      expect(find.text('Classes'), findsOneWidget);
+      expect(find.byKey(const Key('admin-add-class')), findsOneWidget);
+      // The code is the thing an admin has to hand out, so it is readable
+      // rather than hidden behind a tap.
+      expect(find.byKey(const Key('class-code-c2')), findsOneWidget);
+      expect(find.text('ENG6'), findsOneWidget);
+    });
+
+    testWidgets('a class with no code says so instead of showing a blank', (
+      tester,
+    ) async {
+      await pumpAdmin(tester);
+      await openTab(tester, 'People');
+      // Seeded class c1 has no join code.
+      expect(find.text('No code'), findsWidgets);
+    });
+
+    testWidgets('adding a class suggests an unambiguous code', (tester) async {
+      final schools = FakeSchoolsRepository();
+      await pumpAdmin(tester, schools: schools);
+      await openTab(tester, 'People');
+
+      await tester.tap(find.byKey(const Key('admin-add-class')));
+      await tester.pumpAndSettle();
+      expect(find.text('Add a class'), findsOneWidget);
+
+      // Pre-filled, because a class with no code cannot be joined and nothing
+      // would tell the admin why.
+      final field = tester.widget<TextField>(
+        find.byKey(const Key('class-join-code-field')),
+      );
+      final suggested = field.controller!.text;
+      expect(suggested, isNotEmpty);
+      expect(JoinCode.isUnambiguous(suggested), isTrue);
+
+      await tester.enterText(find.byType(TextField).first, 'P4 — Science');
+      await tester.tap(find.widgetWithText(FilledButton, 'Add'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('P4 — Science'), findsWidgets);
+    });
+
+    testWidgets('the empty roster points at the codes above it', (
+      tester,
+    ) async {
+      await pumpAdmin(tester, roster: const []);
+      await openTab(tester, 'People');
+
+      expect(find.text('No students enrolled yet'), findsOneWidget);
+      // No longer names a page the admin shell cannot reach.
+      expect(find.textContaining('on the school page'), findsNothing);
+      expect(
+        find.textContaining('Share a class join code from the Classes card'),
+        findsOneWidget,
+      );
     });
   });
 

@@ -4,10 +4,11 @@ An offline-first Flutter app for *education with AI*, built for Rwandan
 students, their parents and their schools. One codebase renders native-feeling
 chrome on **iOS, Android, macOS and Windows**.
 
-- **Three roles, three shells** — Student (Home / Tutor / Workbook / Lessons /
-  Progress), Parent (Overview / Reports / Messages / Plan) and School admin
-  (License / People / Invoices / Usage), chosen at sign-up and pinned
-  server-side
+- **Four roles, four shells** — Student (Home / Tutor / Workbook / Lessons /
+  Progress), Parent (Overview / Reports / Messages / Plan), Teacher (Classes /
+  Progress) and School admin (License / People / Invoices / Usage), pinned
+  server-side. Three are chosen at sign-up; **teacher is granted only by
+  redeeming a code the school minted**
 - **Two ways to pay** — a school buys per-seat licences after a 30-day trial, or
   a parent with no school subscribes per child. A student is entitled by either;
   see [Who pays, and for what](#who-pays-and-for-what)
@@ -179,6 +180,41 @@ read down a phone), last 30 days, and work once. `redeem_invite()` decides which
 side of the link the signed-in account fills in, and refuses a code offered to
 the wrong role.
 
+### Teachers
+
+A director delegating to teachers is the difference between a 3-class pilot and
+a 30-class school. An admin mints a code on the **People** tab; the teacher signs
+up normally, opens the menu, chooses *Enter a code*, and lands in their own
+shell:
+
+- **Classes** — their school's classes, each with the join code that fills it,
+  and a way to add one.
+- **Progress** — every student across their classes, grouped as *getting things
+  wrong*, *not started yet* and *doing fine*. Absent and struggling are never
+  merged into one "needs attention" pile, because they call for different
+  responses. A student who has answered no checks shows `—`, not `0%`.
+- A class page with the roster, the join code, and **Invite parent** per student.
+
+Three rules the implementation holds to:
+
+- **The role is granted by invitation, never chosen.** `role_from_metadata` does
+  not accept `'teacher'`, so a sign-up cannot claim it; only `redeem_invite` can
+  promote an account, and it does so through a session-local flag that the
+  role-protection trigger recognises. A self-declared teacher would be a
+  stranger asking to read children's progress.
+- **A teacher consumes no seat.** They are billed as staff, not students:
+  `school_seats_used()` counts `role = 'student'` only, and `access_state()`
+  covers a teacher through the licence of the school that employs them.
+- **Aggregates, not conversations.** `class_progress()` is a security-definer
+  function returning counts and an accuracy per student. A teacher never gains
+  the right to read raw `learning_events`, because a child's tutor questions are
+  their own.
+
+> **Not built yet: teacher ↔ parent messaging.** The parent Messages tab still
+> reads seeded content, so making a real thread means replacing the seed on both
+> sides with a messages table. It is the one thing in the teacher brief this pass
+> does not deliver.
+
 ### Who may enrol in a school
 
 A seat belongs to a **student**. Enrolment is refused for anyone else, in the
@@ -192,6 +228,7 @@ somebody else's roster.
 | student | `student` membership, in any school |
 | school admin | `owner` / `teacher`, and only in a school it created |
 | parent | nothing — a parent follows a child through `parent_students` |
+| teacher | nothing — added by redeeming a code, never by self-enrolment |
 
 ### The entitlement gate
 
@@ -366,6 +403,7 @@ Supabase CLI:
 #   supabase/migrations/0003_identity_and_billing.sql (roles, licences, invites, payments)
 #   supabase/migrations/0004_role_repair_and_enrolment_rules.sql
 #   supabase/migrations/0005_test_pricing.sql
+#   supabase/migrations/0006_teachers.sql
 #   supabase/seed.sql                                  (optional demo schools/classes)
 ```
 

@@ -23,6 +23,13 @@ abstract final class AppRoutes {
   static const parentMessages = '/parent/messages';
   static const parentPlan = '/parent/plan';
 
+  // ---- teacher tabs ------------------------------------------------------
+  static const teacherClasses = '/teacher';
+  static const teacherProgress = '/teacher/progress';
+
+  /// One class's roster and activity, pushed over the teacher shell.
+  static String teacherClass(String id) => '/teacher/class/$id';
+
   // ---- school-admin tabs -------------------------------------------------
   static const adminLicense = '/admin';
   static const adminSeats = '/admin/seats';
@@ -50,6 +57,7 @@ abstract final class AppRoutes {
   static String homeFor(AppRole role) => switch (role) {
     AppRole.student => home,
     AppRole.parent => parentOverview,
+    AppRole.teacher => teacherClasses,
     AppRole.schoolAdmin => adminLicense,
   };
 
@@ -63,6 +71,7 @@ abstract final class AppRoutes {
       parentMessages,
       parentPlan,
     },
+    AppRole.teacher => const {teacherClasses, teacherProgress},
     AppRole.schoolAdmin => const {
       adminLicense,
       adminSeats,

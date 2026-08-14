@@ -76,6 +76,12 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
     AppRole.schoolAdmin =>
       'Account created. Confirm your email, sign in, then create your school '
           'to start a 30-day trial.',
+    // Not reachable: the picker does not offer it, because a teacher is made by
+    // redeeming a code their school minted. Handled so the switch stays
+    // exhaustive rather than falling through to a wildcard.
+    AppRole.teacher =>
+      'Account created. Sign in, then enter the teacher code your school gave '
+          'you.',
   };
 
   @override
@@ -179,6 +185,15 @@ class _RolePicker extends StatelessWidget {
   final bool enabled;
   final ValueChanged<AppRole> onChanged;
 
+  /// The roles somebody may choose for themselves. Teacher is absent on
+  /// purpose: it is granted by redeeming a code the school minted, because a
+  /// self-declared teacher is a stranger asking to read children's progress.
+  static const _offered = [
+    AppRole.student,
+    AppRole.parent,
+    AppRole.schoolAdmin,
+  ];
+
   static const _copy = {
     AppRole.student: (
       icon: Icons.school_outlined,
@@ -214,7 +229,7 @@ class _RolePicker extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 10),
-        for (final role in AppRole.values)
+        for (final role in _offered)
           Padding(
             padding: const EdgeInsets.only(bottom: 8),
             child: _RoleCard(

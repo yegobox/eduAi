@@ -85,7 +85,13 @@ class _MoreSheet extends ConsumerWidget {
           if (role != AppRole.schoolAdmin)
             _MoreItem(
               icon: Icons.family_restroom_outlined,
-              label: role == AppRole.parent ? 'My children' : 'My parents',
+              label: switch (role) {
+                AppRole.parent => 'My children',
+                // A teacher reaches the same page to redeem the code that makes
+                // them a teacher in the first place.
+                AppRole.teacher => 'Enter a code',
+                _ => 'My parents',
+              },
               onTap: () {
                 Navigator.of(context).pop();
                 host.push(AppRoutes.family);

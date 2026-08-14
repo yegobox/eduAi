@@ -58,6 +58,16 @@ _Prompt _promptFor(AccessState access) {
         actionLabel: 'Enter a join code',
         route: AppRoutes.schools,
       ),
+      // A teacher with no school has not redeemed their code yet. There is
+      // nothing for them to buy — only a code to enter.
+      AppRole.teacher => const _Prompt(
+        title: 'Enter your teacher code',
+        body:
+            'Your school adds you with a code from its People tab. Once you '
+            'redeem it, your classes appear here.',
+        actionLabel: 'Enter a code',
+        route: AppRoutes.family,
+      ),
     };
   }
 
@@ -86,6 +96,15 @@ _Prompt _promptFor(AccessState access) {
           "$school's EduAI licence has lapsed, so the AI Tutor is paused. "
           'Your lessons, workbook pages and progress are all still here. Ask '
           'your teacher when it will be back.',
+    ),
+    // A teacher cannot pay their school's invoice either, so they get the
+    // situation and no button pretending otherwise.
+    AppRole.teacher => _Prompt(
+      title: 'Paused until the licence is paid',
+      body:
+          "$school's EduAI licence has lapsed. Your classes and rosters are "
+          'unchanged, but the AI features are off for your students until the '
+          'school settles it.',
     ),
   };
 }
@@ -274,6 +293,9 @@ class AccessNotice extends ConsumerWidget {
               'off for your students.$ended',
           AppRole.parent =>
             'No plan is covering your children yet.$ended',
+          AppRole.teacher =>
+            "Your school's licence is unpaid, so AI features are off for your "
+                'students.$ended',
           AppRole.student => 'AI features are paused.$ended',
         };
 
@@ -281,6 +303,7 @@ class AccessNotice extends ConsumerWidget {
         return switch (access.role) {
           AppRole.schoolAdmin => 'Create your school to start your 30-day trial.',
           AppRole.parent => 'Link a child to see their progress.',
+          AppRole.teacher => 'Enter the teacher code your school gave you.',
           AppRole.student => 'Join your school, or ask a parent to subscribe.',
         };
     }

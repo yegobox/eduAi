@@ -66,6 +66,9 @@ class LinkingActionController extends AutoDisposeNotifier<ActionState> {
     () => _repo.inviteParent(studentId: studentId, contact: contact),
   );
 
+  Future<Result<FamilyInvite>> inviteTeacher({String? contact}) =>
+      _run(() => _repo.inviteTeacher(contact: contact));
+
   Future<Result<void>> redeemCode(String code) =>
       _run(() => _repo.redeemCode(code));
 

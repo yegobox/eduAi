@@ -7,11 +7,18 @@
 enum AppRole {
   student,
   parent,
+
+  /// Employed by a school to run classes. Deliberately **not** offered at
+  /// sign-up: the role is granted only by redeeming a code the school minted,
+  /// because a self-declared teacher would be a stranger asking to read
+  /// children's progress. See `0006_teachers.sql`.
+  teacher,
   schoolAdmin;
 
   String get label => switch (this) {
     AppRole.student => 'Student',
     AppRole.parent => 'Parent',
+    AppRole.teacher => 'Teacher',
     AppRole.schoolAdmin => 'School admin',
   };
 
@@ -19,6 +26,7 @@ enum AppRole {
   String get wireName => switch (this) {
     AppRole.student => 'student',
     AppRole.parent => 'parent',
+    AppRole.teacher => 'teacher',
     AppRole.schoolAdmin => 'school_admin',
   };
 
@@ -27,6 +35,7 @@ enum AppRole {
   static AppRole fromWire(String? value) {
     return switch (value?.trim().toLowerCase()) {
       'parent' => AppRole.parent,
+      'teacher' => AppRole.teacher,
       'school_admin' || 'schooladmin' || 'admin' => AppRole.schoolAdmin,
       _ => AppRole.student,
     };

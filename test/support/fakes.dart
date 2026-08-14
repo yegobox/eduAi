@@ -21,6 +21,8 @@ import 'package:eduai/features/schools/domain/entities/membership.dart';
 import 'package:eduai/features/schools/domain/entities/school.dart';
 import 'package:eduai/features/schools/domain/entities/school_class.dart';
 import 'package:eduai/features/schools/domain/repositories/schools_repository.dart';
+import 'package:eduai/features/teacher/domain/entities/teacher_class.dart';
+import 'package:eduai/features/teacher/domain/repositories/teacher_repository.dart';
 import 'package:eduai/features/tutor/domain/entities/tutor_block.dart';
 import 'package:eduai/features/tutor/domain/entities/tutor_turn.dart';
 import 'package:eduai/features/tutor/domain/repositories/tutor_repository.dart';
@@ -711,6 +713,38 @@ class FakeAccessRepository implements AccessRepository {
   }
 }
 
+/// In-memory [TeacherRepository] with a couple of classes and rosters.
+class FakeTeacherRepository implements TeacherRepository {
+  FakeTeacherRepository({List<TeacherClass>? classes, this.progress = const {}})
+    : classes = [...?classes];
+
+  final List<TeacherClass> classes;
+
+  /// classId → the roster returned for it.
+  final Map<String, List<StudentProgress>> progress;
+
+  /// Class ids a caller tried to read, so a test can assert scoping.
+  final List<String> progressReads = [];
+
+  @override
+  Future<Result<List<TeacherClass>>> fetchClasses() async =>
+      Result.success(classes);
+
+  @override
+  Future<Result<List<StudentProgress>>> fetchClassProgress(
+    String classId, {
+    int days = 30,
+  }) async {
+    progressReads.add(classId);
+    // Mirrors the server, which raises rather than returning an empty roster
+    // for a class that is not yours.
+    if (!classes.any((c) => c.id == classId)) {
+      return const Result.failure(ValidationFailure('that class is not yours'));
+    }
+    return Result.success(progress[classId] ?? const []);
+  }
+}
+
 /// In-memory [LinkingRepository] holding one family's links and invites.
 class FakeLinkingRepository implements LinkingRepository {
   FakeLinkingRepository({
@@ -785,6 +819,10 @@ class FakeLinkingRepository implements LinkingRepository {
     );
     return Result.success(invite);
   }
+
+  @override
+  Future<Result<FamilyInvite>> inviteTeacher({String? contact}) async =>
+      _mint(InviteKind.teacherOfSchool, contact: contact);
 
   @override
   Future<Result<void>> redeemCode(String code) async {

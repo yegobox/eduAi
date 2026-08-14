@@ -39,6 +39,10 @@ class SchoolsActionController extends AutoDisposeNotifier<ActionState> {
         'Parent accounts do not join schools. Link your child instead, and '
         'their school comes with them.',
       ),
+      AppRole.teacher => const ValidationFailure(
+        'Teacher accounts are added by their school, not by enrolling. Ask '
+        'your director for a teacher code.',
+      ),
     };
   }
 

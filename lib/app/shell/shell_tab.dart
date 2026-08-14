@@ -54,6 +54,15 @@ abstract final class ShellTabs {
     ShellTab(label: 'Plan', icon: Icons.shield_outlined, route: '/parent/plan'),
   ];
 
+  static const teacher = <ShellTab>[
+    ShellTab(label: 'Classes', icon: Icons.groups_outlined, route: '/teacher'),
+    ShellTab(
+      label: 'Progress',
+      icon: Icons.insights_outlined,
+      route: '/teacher/progress',
+    ),
+  ];
+
   static const schoolAdmin = <ShellTab>[
     ShellTab(label: 'License', icon: Icons.shield_outlined, route: '/admin'),
     // "People" rather than "Seats": the tab lists the students who consume the
@@ -79,6 +88,7 @@ abstract final class ShellTabs {
   static List<ShellTab> forRole(AppRole role) => switch (role) {
     AppRole.student => student,
     AppRole.parent => parent,
+    AppRole.teacher => teacher,
     AppRole.schoolAdmin => schoolAdmin,
   };
 }
