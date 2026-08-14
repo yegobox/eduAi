@@ -9,6 +9,15 @@
 # packages, and plugins designed to encourage good coding practices.
 include: package:flutter_lints/flutter.yaml
 
+analyzer:
+  # `flutter analyze` with no arguments walks the whole tree, and the macOS
+  # build pulls Firebase's Swift-package checkouts — with their own Dart tests —
+  # into build/. Those reported ~700 issues that have nothing to do with this
+  # app, which made the one command anybody runs to check code quality useless
+  # locally. CI never saw them because build/ is git-ignored.
+  exclude:
+    - build/**
+
 linter:
   # The lint rules applied to this project can be customized in the
   # section below to disable rules from the `package:flutter_lints/flutter.yaml`
