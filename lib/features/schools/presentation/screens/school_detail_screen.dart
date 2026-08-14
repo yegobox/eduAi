@@ -13,9 +13,16 @@ import '../../application/schools_providers.dart';
 import '../../domain/entities/membership.dart';
 import '../../domain/entities/school.dart';
 import '../../domain/entities/school_class.dart';
-import '../widgets/schools_dialogs.dart';
 
-/// A school's page: join the school, browse and join its classes, add a class.
+
+/// A school's page, as a *student* sees it: join the school, browse its classes,
+/// join one.
+///
+/// Read-only about the school itself. This route is only reachable from the
+/// student home, and authoring belongs to the people who can actually do it —
+/// an admin on the People tab, a teacher on their Classes tab. It used to offer
+/// "Add class" to whoever opened it, which for a student was a button the server
+/// would always refuse.
 class SchoolDetailScreen extends ConsumerWidget {
   const SchoolDetailScreen({super.key, required this.schoolId, this.school});
 
@@ -41,6 +48,12 @@ class SchoolDetailScreen extends ConsumerWidget {
     final schoolMembership = memberships.firstWhereOrNull(
       (m) => m.schoolId == schoolId && m.classId == null,
     );
+    // Joining a class already enrols you in its school — the membership row
+    // carries both ids. Without this, a student who joined a class was still
+    // shown "Join this school", and accepting would add a second, redundant
+    // row for a school they are already in.
+    final memberOfSchool = memberships.any((m) => m.schoolId == schoolId);
+
 
     return DetailScaffold(
       title: resolved?.name ?? 'School',
@@ -61,6 +74,7 @@ class SchoolDetailScreen extends ConsumerWidget {
             _SchoolMembershipCard(
               schoolId: schoolId,
               membership: schoolMembership,
+              memberOfSchool: memberOfSchool,
             ),
             const SizedBox(height: 20),
             const SectionTitle('Classes'),
@@ -73,7 +87,7 @@ class SchoolDetailScreen extends ConsumerWidget {
                 padding: const EdgeInsets.symmetric(vertical: 24),
                 child: Center(
                   child: Text(
-                    'No classes yet. Add the first one.',
+                    'No classes yet. Your school adds them.',
                     style: TextStyle(color: t.ink3),
                   ),
                 ),
@@ -93,12 +107,6 @@ class SchoolDetailScreen extends ConsumerWidget {
                 ],
               ),
             ),
-            const SizedBox(height: 8),
-            FilledButton.tonalIcon(
-              onPressed: () => showCreateClassDialog(context, schoolId),
-              icon: const Icon(Icons.add_circle_outline, size: 16),
-              label: const Text('Add class'),
-            ),
             const SizedBox(height: 24),
           ],
         ),
@@ -108,16 +116,28 @@ class SchoolDetailScreen extends ConsumerWidget {
 }
 
 class _SchoolMembershipCard extends ConsumerWidget {
-  const _SchoolMembershipCard({required this.schoolId, this.membership});
+  const _SchoolMembershipCard({
+    required this.schoolId,
+    required this.memberOfSchool,
+    this.membership,
+  });
 
   final String schoolId;
+
+  /// The school-level row (`class_id is null`), when there is one. Only this
+  /// row can be left from here — a class membership is left from its own tile.
   final Membership? membership;
+
+  /// True when *any* membership ties this account to the school, including one
+  /// that came from joining a class.
+  final bool memberOfSchool;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = AppTokens.read(context);
     final busy = ref.watch(schoolsActionControllerProvider).busy;
-    final joined = membership != null;
+    final joined = memberOfSchool;
+    final canLeaveHere = membership != null;
     // Only students occupy seats, so only students are offered enrolment. The
     // server refuses the insert either way (`may_enrol`); this keeps the screen
     // from advertising an action that would be rejected.
@@ -149,7 +169,9 @@ class _SchoolMembershipCard extends ConsumerWidget {
                 const SizedBox(height: 2),
                 Text(
                   joined
-                      ? 'You can now learn under this school.'
+                      ? canLeaveHere
+                            ? 'You can now learn under this school.'
+                            : 'You joined through a class below.'
                       : canEnrol
                             ? 'Enrol to access this school and its classes.'
                             : 'Only student accounts enrol in a school.',
@@ -159,14 +181,16 @@ class _SchoolMembershipCard extends ConsumerWidget {
             ),
           ),
           const SizedBox(width: 8),
-          if (joined)
+          if (canLeaveHere)
             OutlinedButton(
               onPressed: busy
                   ? null
                   : () => _leave(context, ref, membership!.id),
               child: const Text('Leave'),
             )
-          else if (canEnrol)
+          // Already in the school via a class: nothing to join, and leaving is
+          // the class tile's job.
+          else if (!joined && canEnrol)
             FilledButton(
               onPressed: busy ? null : () => _join(context, ref),
               child: const Text('Join'),
