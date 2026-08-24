@@ -61,15 +61,14 @@ jobs:
 
       - name: Write Firebase config (google-services.json)
         env:
-          GOOGLE_SERVICE_JSON: ${{ secrets.GOOGLE_SERVICE_JSON_EDUAI }}
+          GOOGLE_SERVICE_JSON: ${{ secrets.GOOGLE_SERVICE_JSON }}
         run: |
           if [ -z "$GOOGLE_SERVICE_JSON" ]; then
-            echo "::warning::GOOGLE_SERVICE_JSON_EDUAI not set - Firebase phone auth will be inactive in this build."
+            echo "::warning::GOOGLE_SERVICE_JSON not set - Firebase phone auth will be inactive in this build."
             exit 0
           fi
           printf '%s' "$GOOGLE_SERVICE_JSON" > android/app/google-services.json
-          # A config for the wrong package silently breaks Firebase at runtime.
-          python3 -c "import json,sys; cfg=json.load(open('android/app/google-services.json')); pkgs=[c['client_info']['android_client_info']['package_name'] for c in cfg['client']]; sys.exit('google-services.json has no client for rw.akili.app, found %s' % pkgs) if 'rw.akili.app' not in pkgs else print('google-services.json OK for rw.akili.app')"
+          python3 tool/validate_google_services.py
 
       - name: Configure upload keystore
         working-directory: android
@@ -79,11 +78,26 @@ jobs:
           KEYSTORE_KEY_PASSWORD: ${{ secrets.KEYSTORE_KEY_PASSWORD }}
           KEYSTORE_STORE_PASSWORD: ${{ secrets.KEYSTORE_STORE_PASSWORD }}
         run: |
+          # An empty alias or password produces an unsigned/garbled AAB that Play
+          # rejects only after the upload, so check up front.
+          missing=""
+          for name in PLAY_STORE_UPLOAD_KEY KEYSTORE_KEY_ALIAS KEYSTORE_KEY_PASSWORD KEYSTORE_STORE_PASSWORD; do
+            if [ -z "${!name}" ]; then
+              missing="$missing $name"
+            fi
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::Missing repo secret(s):$missing"
+            exit 1
+          fi
           echo "$PLAY_STORE_UPLOAD_KEY" | base64 --decode > app/key.jks
           echo "storeFile=key.jks" > key.properties
           echo "keyAlias=$KEYSTORE_KEY_ALIAS" >> key.properties
           echo "storePassword=$KEYSTORE_STORE_PASSWORD" >> key.properties
           echo "keyPassword=$KEYSTORE_KEY_PASSWORD" >> key.properties
+          keytool -list -keystore app/key.jks -alias "$KEYSTORE_KEY_ALIAS" \
+            -storepass "$KEYSTORE_STORE_PASSWORD" > /dev/null \
+            || { echo "::error::Keystore does not open with the supplied alias/password."; exit 1; }
 
       - name: Set up Fastlane
         uses: ruby/setup-ruby@v1
@@ -118,7 +132,12 @@ jobs:
           PLAY_STORE_CONFIG_JSON: ${{ secrets.PLAYSTORE_ACCOUNT_KEY }}
           VERSION_CODE: ${{ env.VERSION_CODE }}
           VERSION_NAME: ${{ env.VERSION_NAME }}
-        run: bundle exec fastlane ${{ github.event.inputs.lane || 'internal' }}
+        run: |
+          if [ -z "$PLAY_STORE_CONFIG_JSON" ]; then
+            echo "::error::PLAYSTORE_ACCOUNT_KEY is not set - cannot talk to the Play API."
+            exit 1
+          fi
+          bundle exec fastlane ${{ github.event.inputs.lane || 'internal' }}
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4

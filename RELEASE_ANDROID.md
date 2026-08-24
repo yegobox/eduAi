@@ -60,7 +60,7 @@ source). Set these on `yegobox/eduAi` → Settings → Secrets and variables →
 | `KEYSTORE_STORE_PASSWORD` | from `android/key.properties` |
 | `PLAYSTORE_ACCOUNT_KEY` | The Play Console service-account JSON, same one Flipper uses. Grant that service account access to the new app in Play Console → Users and permissions. |
 | `ENV_JSON` | Full production `env.json`: real `SUPABASE_URL`/`SUPABASE_ANON_KEY`, `APP_FLAVOR: prod`, a reachable `DATA_CONNECTOR_URL` (not localhost), MoMo settings. |
-| `GOOGLE_SERVICE_JSON_EDUAI` | `android/app/google-services.json` — Firebase project `akili-dc22e`, Android app `rw.akili.app`. Only needed when `ENABLE_PHONE_AUTH` is true; the workflow warns and continues without it. |
+| `GOOGLE_SERVICE_JSON` | `android/app/google-services.json` — the Android app config from Firebase project `akili-dc22e` for `rw.akili.app`. Must be the file with a top-level `client` array (not `firebase.json`, not a service-account key). `tool/validate_google_services.py` checks this in CI. Only needed when `ENABLE_PHONE_AUTH` is true; the workflow warns and continues without it. |
 
 Set them from the working copy with the `gh` CLI:
 
@@ -71,7 +71,7 @@ base64 -i android/app/key.jks | gh secret set PLAY_STORE_UPLOAD_KEY -R $R
 grep '^keyAlias='       android/key.properties | cut -d= -f2- | tr -d '\n' | gh secret set KEYSTORE_KEY_ALIAS -R $R
 grep '^keyPassword='    android/key.properties | cut -d= -f2- | tr -d '\n' | gh secret set KEYSTORE_KEY_PASSWORD -R $R
 grep '^storePassword='  android/key.properties | cut -d= -f2- | tr -d '\n' | gh secret set KEYSTORE_STORE_PASSWORD -R $R
-gh secret set GOOGLE_SERVICE_JSON_EDUAI -R $R < android/app/google-services.json
+gh secret set GOOGLE_SERVICE_JSON       -R $R < android/app/google-services.json
 gh secret set ENV_JSON                  -R $R < env.prod.json          # create this first
 gh secret set PLAYSTORE_ACCOUNT_KEY     -R $R < /path/to/play-service-account.json
 ```
