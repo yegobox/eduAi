@@ -1,0 +1,2 @@
+# json_key_file("") # Supplied at runtime via PLAY_STORE_CONFIG_JSON (see Fastfile)
+package_name("rw.akili.app")

@@ -1,0 +1,129 @@
+name: Release Android (Play Store)
+
+on:
+  # Manual releases: pick the track you want to ship to.
+  workflow_dispatch:
+    inputs:
+      lane:
+        description: "Fastlane lane"
+        required: true
+        default: "internal"
+        type: choice
+        options:
+          - build_only
+          - internal
+          - beta
+          - production
+          - promote_to_production
+  # Tag-driven releases: android-v1.2.3 -> internal track.
+  push:
+    tags:
+      - "android-v*"
+
+concurrency:
+  group: release-android
+  cancel-in-progress: false
+
+jobs:
+  play-deploy:
+    name: "Build & upload to Google Play"
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: "zulu"
+          java-version: "17"
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.44.6
+          channel: stable
+          cache: true
+
+      - name: Write compile-time config (env.json)
+        env:
+          ENV_JSON: ${{ secrets.ENV_JSON }}
+        run: |
+          if [ -z "$ENV_JSON" ]; then
+            echo "::error::ENV_JSON secret is not set - the release build has no Supabase/MoMo config."
+            exit 1
+          fi
+          printf '%s' "$ENV_JSON" > env.json
+          # Fail fast on a malformed secret rather than deep inside the Dart build.
+          python3 -c "import json,sys; json.load(open('env.json'))"
+
+      - name: Write Firebase config (google-services.json)
+        env:
+          GOOGLE_SERVICE_JSON: ${{ secrets.GOOGLE_SERVICE_JSON_EDUAI }}
+        run: |
+          if [ -z "$GOOGLE_SERVICE_JSON" ]; then
+            echo "::warning::GOOGLE_SERVICE_JSON_EDUAI not set - Firebase phone auth will be inactive in this build."
+            exit 0
+          fi
+          printf '%s' "$GOOGLE_SERVICE_JSON" > android/app/google-services.json
+          # A config for the wrong package silently breaks Firebase at runtime.
+          python3 -c "import json,sys; cfg=json.load(open('android/app/google-services.json')); pkgs=[c['client_info']['android_client_info']['package_name'] for c in cfg['client']]; sys.exit('google-services.json has no client for rw.akili.app, found %s' % pkgs) if 'rw.akili.app' not in pkgs else print('google-services.json OK for rw.akili.app')"
+
+      - name: Configure upload keystore
+        working-directory: android
+        env:
+          PLAY_STORE_UPLOAD_KEY: ${{ secrets.PLAY_STORE_UPLOAD_KEY }}
+          KEYSTORE_KEY_ALIAS: ${{ secrets.KEYSTORE_KEY_ALIAS }}
+          KEYSTORE_KEY_PASSWORD: ${{ secrets.KEYSTORE_KEY_PASSWORD }}
+          KEYSTORE_STORE_PASSWORD: ${{ secrets.KEYSTORE_STORE_PASSWORD }}
+        run: |
+          echo "$PLAY_STORE_UPLOAD_KEY" | base64 --decode > app/key.jks
+          echo "storeFile=key.jks" > key.properties
+          echo "keyAlias=$KEYSTORE_KEY_ALIAS" >> key.properties
+          echo "storePassword=$KEYSTORE_STORE_PASSWORD" >> key.properties
+          echo "keyPassword=$KEYSTORE_KEY_PASSWORD" >> key.properties
+
+      - name: Set up Fastlane
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.2"
+          bundler-cache: true
+          working-directory: android
+
+      - name: Calculate version
+        run: |
+          # Monotonic across runs; the manual first upload used versionCode 1.
+          VERSION_CODE=$(( ${{ github.run_number }} + 1000 ))
+          VERSION_NAME="1.0.${{ github.run_number }}"
+          echo "VERSION_CODE=$VERSION_CODE" >> $GITHUB_ENV
+          echo "VERSION_NAME=$VERSION_NAME" >> $GITHUB_ENV
+
+      - run: flutter pub get
+
+      # First release only: Play's API cannot create an app or make its first
+      # upload, so build the signed AAB here and upload it by hand in the Console.
+      - name: Build signed AAB (no upload)
+        if: github.event.inputs.lane == 'build_only'
+        env:
+          VERSION_CODE: ${{ env.VERSION_CODE }}
+          VERSION_NAME: ${{ env.VERSION_NAME }}
+        run: flutter build appbundle --release --dart-define-from-file=env.json
+
+      - name: Fastlane deploy
+        if: github.event.inputs.lane != 'build_only'
+        working-directory: android
+        env:
+          PLAY_STORE_CONFIG_JSON: ${{ secrets.PLAYSTORE_ACCOUNT_KEY }}
+          VERSION_CODE: ${{ env.VERSION_CODE }}
+          VERSION_NAME: ${{ env.VERSION_NAME }}
+        run: bundle exec fastlane ${{ github.event.inputs.lane || 'internal' }}
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eduai-android-${{ github.run_number }}
+          if-no-files-found: ignore
+          path: |
+            build/app/outputs/bundle/**/*.aab
+            build/app/outputs/mapping/**/*.txt

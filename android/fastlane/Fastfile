@@ -1,0 +1,71 @@
+default_platform(:android)
+
+PACKAGE_NAME = 'rw.akili.app'
+
+# Gradle redirects build output to <project>/build (see android/build.gradle.kts),
+# so the bundle lands one level above android/, not under android/app/build.
+def release_aab_path
+  android_dir = File.expand_path('..', __dir__)
+  File.expand_path('../build/app/outputs/bundle/release/app-release.aab', android_dir)
+end
+
+# Compile-time config lives in env.json (dart-define-from-file). CI writes it
+# from the ENV_JSON secret before this runs; locally it is your own env.json.
+def env_file_flag
+  project_dir = File.expand_path('../..', __dir__)
+  env_file = File.join(project_dir, 'env.json')
+  UI.user_error!("env.json missing at #{env_file}") unless File.exist?(env_file)
+  "--dart-define-from-file=#{env_file}"
+end
+
+def build_release_bundle
+  # CI can build the bundle in a dedicated step and skip rebuilding here.
+  if ENV['AAB_PREBUILT'] == 'true'
+    aab = release_aab_path
+    UI.user_error!("AAB missing at #{aab}") unless File.exist?(aab)
+    return
+  end
+
+  sh "cd ../.. && flutter build appbundle --release #{env_file_flag}"
+end
+
+def upload(track:, promote_to: nil)
+  upload_to_play_store(
+    package_name: PACKAGE_NAME,
+    track: track,
+    track_promote_to: promote_to,
+    aab: promote_to ? nil : release_aab_path,
+    json_key_data: ENV['PLAY_STORE_CONFIG_JSON'],
+    skip_upload_apk: true,
+    skip_upload_metadata: true,
+    skip_upload_images: true,
+    skip_upload_screenshots: true,
+    # Release notes come from fastlane/metadata/android/*/changelogs/default.txt
+    skip_upload_changelogs: false
+  )
+end
+
+platform :android do
+  desc 'Submit a new internal build to Google Play'
+  lane :internal do
+    build_release_bundle
+    upload(track: 'internal')
+  end
+
+  desc 'Submit a new closed-testing (beta) build to Google Play'
+  lane :beta do
+    build_release_bundle
+    upload(track: 'beta')
+  end
+
+  desc 'Submit a new production build to Google Play'
+  lane :production do
+    build_release_bundle
+    upload(track: 'production')
+  end
+
+  desc 'Promote the current beta track to production (no rebuild)'
+  lane :promote_to_production do
+    upload(track: 'beta', promote_to: 'production')
+  end
+end

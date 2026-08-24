@@ -46,4 +46,6 @@ app.*.map.json
 
 # Local secrets / env
 env.json
+env.prod.json
+firebase.json
 *.env
