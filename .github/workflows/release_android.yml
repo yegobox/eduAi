@@ -15,8 +15,10 @@ on:
           - beta
           - production
           - promote_to_production
-  # Tag-driven releases: android-v1.2.3 -> internal track.
+  # Every push, on any branch, ships to the internal track; android-v* tags do too.
   push:
+    branches:
+      - "**"
     tags:
       - "android-v*"
 

@@ -81,9 +81,15 @@ asking Google to reset the upload key.
 
 ## 3. Shipping after that
 
-- **Manual**: Actions → *Release Android (Play Store)* → Run workflow → pick a lane
-  (`internal`, `beta`, `production`, `promote_to_production`).
+- **On every push, any branch** → internal track. No commit-message opt-in, no branch
+  filter: if you push, it ships to internal testing.
 - **On tag**: `git tag android-v1.0.3 && git push origin android-v1.0.3` → internal track.
+- **Manual**: Actions → *Release Android (Play Store)* → Run workflow → pick a lane
+  (`build_only`, `internal`, `beta`, `production`, `promote_to_production`). `beta` and
+  `production` are only ever reached this way.
+
+Runs share one `release-android` concurrency group and queue rather than cancel, so
+back-to-back pushes upload in order instead of interrupting an in-flight Play upload.
 
 Versioning is driven by CI, not `pubspec.yaml`:
 `versionCode = github.run_number + 1000`, `versionName = 1.0.<run_number>`. The gradle
