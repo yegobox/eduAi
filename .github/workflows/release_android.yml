@@ -119,15 +119,6 @@ jobs:
           bundler-cache: true
           working-directory: android
 
-      # The runner image ships a set of platforms that lags the newest API; the
-      # build needs android-37 for flutter_secure_storage 11.
-      - name: Ensure Android SDK platform 37
-        run: |
-          if [ ! -d "$ANDROID_HOME/platforms/android-37" ]; then
-            yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-37" > /dev/null
-          fi
-          ls "$ANDROID_HOME/platforms"
-
       - name: Calculate version
         run: |
           # Monotonic across runs; the manual first upload used versionCode 1.

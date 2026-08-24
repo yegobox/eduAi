@@ -32,11 +32,7 @@ val hasReleaseKeystore = keystorePropertiesFile.exists()
 
 android {
     namespace = "rw.akili.app"
-    // flutter_secure_storage 11 ships an AAR built against API 37, so anything
-    // depending on it must compile against 37+. Flutter's default is still 36.
-    // AGP 9.0.1 only "recommends" up to 36 - see the suppress flag in
-    // gradle.properties, which downgrades that warning.
-    compileSdk = 37
+    compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
