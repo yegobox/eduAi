@@ -90,7 +90,18 @@ jobs:
             echo "::error::Missing repo secret(s):$missing"
             exit 1
           fi
-          echo "$PLAY_STORE_UPLOAD_KEY" | base64 --decode > app/key.jks
+          # Strip any stray whitespace/CR from the pasted secret before decoding;
+          # GNU base64 rejects CR outright with "invalid input".
+          if ! printf '%s' "$PLAY_STORE_UPLOAD_KEY" | tr -d '[:space:]' | base64 --decode > app/key.jks; then
+            echo "::error::PLAY_STORE_UPLOAD_KEY is not valid base64. Set it with: base64 -i android/app/key.jks | gh secret set PLAY_STORE_UPLOAD_KEY -R $GITHUB_REPOSITORY"
+            exit 1
+          fi
+          # A JKS/PKCS12 keystore starts with 0xFEEDFEED or 0x30 - catch a raw
+          # (un-encoded) upload before the confusing keytool error.
+          if [ ! -s app/key.jks ]; then
+            echo "::error::Decoded keystore is empty."
+            exit 1
+          fi
           echo "storeFile=key.jks" > key.properties
           echo "keyAlias=$KEYSTORE_KEY_ALIAS" >> key.properties
           echo "storePassword=$KEYSTORE_STORE_PASSWORD" >> key.properties

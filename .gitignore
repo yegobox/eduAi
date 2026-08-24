@@ -49,3 +49,8 @@ env.json
 env.prod.json
 firebase.json
 *.env
+
+# Service-account keys (Firebase Admin, Google Play API) - never commit these
+*-firebase-adminsdk-*.json
+*service-account*.json
+play-store-*.json
