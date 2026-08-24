@@ -113,7 +113,9 @@ jobs:
       - name: Set up Fastlane
         uses: ruby/setup-ruby@v1
         with:
-          ruby-version: "3.2"
+          # fastlane 2.238 warns on Ruby < 3.3 and will require 3.3+ soon.
+          # The bundler version comes from android/Gemfile.lock (BUNDLED WITH).
+          ruby-version: "3.4"
           bundler-cache: true
           working-directory: android
 
@@ -143,6 +145,9 @@ jobs:
           PLAY_STORE_CONFIG_JSON: ${{ secrets.PLAYSTORE_ACCOUNT_KEY }}
           VERSION_CODE: ${{ env.VERSION_CODE }}
           VERSION_NAME: ${{ env.VERSION_NAME }}
+          # fastlane refuses to run reliably without a UTF-8 locale.
+          LANG: C.UTF-8
+          LC_ALL: C.UTF-8
         run: |
           if [ -z "$PLAY_STORE_CONFIG_JSON" ]; then
             echo "::error::PLAYSTORE_ACCOUNT_KEY is not set - cannot talk to the Play API."
