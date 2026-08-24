@@ -91,10 +91,15 @@ asking Google to reset the upload key.
 Runs share one `release-android` concurrency group and queue rather than cancel, so
 back-to-back pushes upload in order instead of interrupting an in-flight Play upload.
 
-Versioning is driven by CI, not `pubspec.yaml`:
-`versionCode = github.run_number + 1000`, `versionName = 1.0.<run_number>`. The gradle
-config reads `VERSION_CODE` / `VERSION_NAME` from the environment and falls back to the
-pubspec values locally. The +1000 offset keeps CI codes safely above the manual `1`.
+Versioning is driven by CI, not `pubspec.yaml`. The gradle config reads `VERSION_CODE` /
+`VERSION_NAME` from the environment and falls back to the pubspec values only for local
+builds, so bumping `version:` in `pubspec.yaml` does **not** change what CI ships.
+
+- `versionCode` = minutes since the Unix epoch (~29.8M as of Aug 2026, rising ~1440/day).
+  Play rejects any code it has seen before on any track, and `github.run_number` repeats
+  when a run is re-run — a clock-derived code never collides. Headroom to year ~5900.
+- `versionName` = `1.0.<github.run_number>`. Duplicates are allowed by Play, so a re-run
+  reusing a name is harmless.
 
 Release notes: `android/fastlane/metadata/android/en-US/changelogs/default.txt`.
 
