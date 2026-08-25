@@ -107,6 +107,55 @@ void main() {
       }
     });
 
+    testWidgets('a phone-width desktop window moves the tabs to the bottom', (
+      tester,
+    ) async {
+      // A resized macOS window (or a phone frame in the device previewer) has
+      // no room for the toolbar's title + segmented control + status actions.
+      for (final platform in AppPlatformStyle.values) {
+        await pumpApp(
+          tester,
+          auth: FakeAuthRepository(initialSession: _session),
+          platform: platform,
+          size: mobileSize,
+        );
+        expect(tester.takeException(), isNull, reason: '$platform');
+        for (final label in ['Home', 'Tutor', 'Workbook']) {
+          expect(find.text(label), findsWidgets, reason: '$platform / $label');
+        }
+      }
+    });
+
+    testWidgets('a phone-width window opens the menu as a sheet', (
+      tester,
+    ) async {
+      await pumpApp(
+        tester,
+        auth: FakeAuthRepository(initialSession: _session),
+        platform: AppPlatformStyle.macos,
+        size: mobileSize,
+      );
+      await tester.tap(find.byIcon(Icons.more_vert));
+      await tester.pumpAndSettle();
+      expect(find.byType(Dialog), findsNothing);
+      expect(find.text('Sign out'), findsOneWidget);
+    });
+
+    testWidgets('the desktop toolbar survives a mid-width window', (
+      tester,
+    ) async {
+      // Just above the compact breakpoint — the widest window that still shows
+      // a desktop toolbar, and the one that used to overflow.
+      await pumpApp(
+        tester,
+        auth: FakeAuthRepository(initialSession: _session),
+        platform: AppPlatformStyle.macos,
+        size: const Size(710, 900),
+      );
+      expect(tester.takeException(), isNull);
+      expect(find.byType(NavigationBar), findsNothing);
+    });
+
     testWidgets('Windows shows the app identity strip', (tester) async {
       await pumpApp(
         tester,

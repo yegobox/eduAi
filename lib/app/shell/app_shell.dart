@@ -38,6 +38,27 @@ class AppShell extends ConsumerWidget {
     final platform = ref.watch(appPlatformStyleProvider);
     final title = tabs[navigationShell.currentIndex].label;
 
+    // A phone-width window gets the mobile chrome even under a desktop design
+    // language: a title, a tab strip and the status actions do not fit on one
+    // toolbar row, and tabs at the bottom are what a narrow window expects.
+    if (isCompactChrome(context)) {
+      return platform.isApple
+          ? _IosShell(
+              title: title,
+              tabs: tabs,
+              index: navigationShell.currentIndex,
+              onTab: _goBranch,
+              child: navigationShell,
+            )
+          : _AndroidShell(
+              title: title,
+              tabs: tabs,
+              index: navigationShell.currentIndex,
+              onTab: _goBranch,
+              child: navigationShell,
+            );
+    }
+
     return switch (platform) {
       AppPlatformStyle.ios => _IosShell(
         title: title,
@@ -82,8 +103,9 @@ class ShellContent extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final platform = ref.watch(appPlatformStyleProvider);
+    final roomy = platform.isDesktop && !isCompactChrome(context);
     final pad = padded
-        ? (platform.isDesktop
+        ? (roomy
               ? const EdgeInsets.fromLTRB(26, 8, 26, 24)
               : const EdgeInsets.fromLTRB(16, 4, 16, 20))
         : EdgeInsets.zero;
@@ -130,6 +152,8 @@ class _IosShell extends ConsumerWidget {
                   Expanded(
                     child: Text(
                       title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         fontSize: t.h1,
                         fontWeight: FontWeight.w800,
@@ -189,12 +213,18 @@ class _IosTabBar extends StatelessWidget {
                           color: i == index ? t.brand : t.ink3,
                         ),
                         const SizedBox(height: 2),
-                        Text(
-                          tabs[i].label,
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: i == index ? t.brand : t.ink3,
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 2),
+                          child: Text(
+                            tabs[i].label,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: i == index ? t.brand : t.ink3,
+                            ),
                           ),
                         ),
                       ],
@@ -284,9 +314,14 @@ class _MacShell extends StatelessWidget {
               ),
               child: Row(
                 children: [
-                  Expanded(
+                  // Bounded, not Expanded: the title takes what it needs and
+                  // gives the rest of the row to the tabs.
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 220),
                     child: Text(
                       title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         fontSize: t.h2,
                         fontWeight: FontWeight.w700,
@@ -294,13 +329,30 @@ class _MacShell extends StatelessWidget {
                       ),
                     ),
                   ),
-                  AppSegmented<int>(
-                    values: [for (var i = 0; i < tabs.length; i++) i],
-                    labelOf: (i) => tabs[i].label,
-                    selected: index,
-                    onChanged: onTab,
+                  const SizedBox(width: 16),
+                  // Centred while the segments fit, scrollable once a role has
+                  // more tabs than the window is wide — never an overflow.
+                  Expanded(
+                    child: LayoutBuilder(
+                      builder: (context, constraints) => SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(
+                            minWidth: constraints.maxWidth,
+                          ),
+                          child: Center(
+                            child: AppSegmented<int>(
+                              values: [for (var i = 0; i < tabs.length; i++) i],
+                              labelOf: (i) => tabs[i].label,
+                              selected: index,
+                              onChanged: onTab,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
-                  const Spacer(),
+                  const SizedBox(width: 12),
                   const _TrailingActions(compact: true),
                 ],
               ),
@@ -381,16 +433,26 @@ class _WindowsShell extends StatelessWidget {
             ),
             child: Row(
               children: [
-                for (var i = 0; i < tabs.length; i++)
-                  Padding(
-                    padding: const EdgeInsets.only(right: 22),
-                    child: _PivotTab(
-                      tab: tabs[i],
-                      selected: i == index,
-                      onTap: () => onTab(i),
+                // The pivot strip scrolls rather than overflowing when the
+                // window is narrower than the role's tab set.
+                Expanded(
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        for (var i = 0; i < tabs.length; i++)
+                          Padding(
+                            padding: const EdgeInsets.only(right: 22),
+                            child: _PivotTab(
+                              tab: tabs[i],
+                              selected: i == index,
+                              onTap: () => onTab(i),
+                            ),
+                          ),
+                      ],
                     ),
                   ),
-                const Spacer(),
+                ),
                 const _TrailingActions(compact: true),
               ],
             ),

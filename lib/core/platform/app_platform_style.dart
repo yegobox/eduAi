@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// Which native design language the chrome and tokens follow.
@@ -37,3 +38,18 @@ enum AppPlatformStyle {
 final appPlatformStyleProvider = Provider<AppPlatformStyle>((ref) {
   return AppPlatformStyle.fromTarget(defaultTargetPlatform);
 });
+
+/// Window width below which the navigation chrome collapses to its mobile
+/// shape — a bottom tab bar and bottom-sheet menus — whatever design language
+/// is active.
+///
+/// A desktop toolbar cannot hold a title, a tab strip and the status actions in
+/// a phone-width window, and a resized macOS window (or a phone frame in the
+/// device previewer) is exactly that. Tabs belong at the bottom there.
+const double kCompactChromeWidth = 700;
+
+/// Whether the chrome around [context] should use the compact (bottom tab bar)
+/// shape. Reads the *simulated* size under the device previewer, which is what
+/// makes a phone frame on a Mac look like a phone.
+bool isCompactChrome(BuildContext context) =>
+    MediaQuery.sizeOf(context).width < kCompactChromeWidth;

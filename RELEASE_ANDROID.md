@@ -115,8 +115,11 @@ Set `AAB_PREBUILT=true` to upload a bundle you already built instead of rebuildi
 
 ## Notes / still open
 
-- iOS and macOS bundle IDs are still `rw.eduai.eduai`. Only Android was renamed; change
-  them when you go to the App Store.
+- iOS, macOS and Android all use `rw.akili.app`. The Firebase iOS/macOS app
+  (`1:421662211826:ios:398b89b89bf80003e15a6b`) is still registered under the old
+  `rw.eduai.eduai` bundle ID — update it in the Firebase console (or re-run
+  `flutterfire configure`) before shipping, otherwise the iOS SDK will warn about a
+  bundle-ID mismatch. Linux/Windows still use `rw.eduai.eduai`.
 - The launcher label in `android/app/src/main/AndroidManifest.xml` is still `eduai`.
   The Play listing name is separate, but pick the final on-device name before launch.
 - Production rollout: personal Play accounts need 12 testers for 14 days first;

@@ -64,7 +64,7 @@ class DefaultFirebaseOptions {
     messagingSenderId: '421662211826',
     projectId: 'akili-dc22e',
     storageBucket: 'akili-dc22e.firebasestorage.app',
-    iosBundleId: 'rw.eduai.eduai',
+    iosBundleId: 'rw.akili.app',
   );
 
   static const FirebaseOptions macos = FirebaseOptions(
@@ -73,7 +73,7 @@ class DefaultFirebaseOptions {
     messagingSenderId: '421662211826',
     projectId: 'akili-dc22e',
     storageBucket: 'akili-dc22e.firebasestorage.app',
-    iosBundleId: 'rw.eduai.eduai',
+    iosBundleId: 'rw.akili.app',
   );
 
   static const FirebaseOptions windows = FirebaseOptions(

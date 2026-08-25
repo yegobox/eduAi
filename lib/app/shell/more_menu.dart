@@ -13,8 +13,9 @@ import '../../features/auth/domain/entities/app_role.dart';
 
 /// The kebab menu present on every screen: offline PIN, language, sign out.
 ///
-/// Presented as a bottom sheet on mobile and a small dialog on desktop, which
-/// is what each platform's users expect from an overflow menu.
+/// Presented as a bottom sheet on mobile (and in any phone-width window) and a
+/// small dialog on desktop, which is what each platform's users expect from an
+/// overflow menu.
 ///
 /// Everything an item does — navigate, open a follow-up dialog, write state —
 /// runs against the *host* screen's `context` and `ref`, never the sheet's.
@@ -22,8 +23,11 @@ import '../../features/auth/domain/entities/app_role.dart';
 /// `WidgetRef` throws on use.
 Future<void> showMoreMenu(BuildContext context, WidgetRef ref) {
   final platform = ref.read(appPlatformStyleProvider);
-  final sheet = _MoreSheet(platform: platform, host: context, hostRef: ref);
-  if (platform.isMobile) {
+  // A phone-width window gets the sheet even on a desktop platform: a 320px
+  // dialog centred in a 390px window is a worse target than a bottom sheet.
+  final asSheet = platform.isMobile || isCompactChrome(context);
+  final sheet = _MoreSheet(asSheet: asSheet, host: context, hostRef: ref);
+  if (asSheet) {
     return showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.transparent,
@@ -38,12 +42,13 @@ Future<void> showMoreMenu(BuildContext context, WidgetRef ref) {
 
 class _MoreSheet extends ConsumerWidget {
   const _MoreSheet({
-    required this.platform,
+    required this.asSheet,
     required this.host,
     required this.hostRef,
   });
 
-  final AppPlatformStyle platform;
+  /// Drawn as a bottom sheet (rounded top, drag handle) rather than a dialog.
+  final bool asSheet;
 
   /// The screen that opened this menu — the anchor for follow-up navigation.
   final BuildContext host;
@@ -61,7 +66,7 @@ class _MoreSheet extends ConsumerWidget {
     return Container(
       decoration: BoxDecoration(
         color: t.surface,
-        borderRadius: platform.isMobile
+        borderRadius: asSheet
             ? const BorderRadius.vertical(top: Radius.circular(20))
             : BorderRadius.circular(14),
       ),
@@ -69,7 +74,7 @@ class _MoreSheet extends ConsumerWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (platform.isMobile)
+          if (asSheet)
             Container(
               width: 36,
               height: 4,
